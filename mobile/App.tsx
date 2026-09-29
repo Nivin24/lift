@@ -12,7 +12,10 @@ import {
   Modal,
   Image,
   PanResponder,
+  Animated,
+  Dimensions,
 } from 'react-native';
+import { MarkdownView } from './src/components/MarkdownView';
 import {
   SearchIcon,
   SunIcon,
@@ -81,6 +84,37 @@ function MainScreen() {
   // In-Island Search state
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Syllabus checklist state for topic detail
+  const [checkedSubtopics, setCheckedSubtopics] = useState<Record<string, boolean>>({});
+
+  // Collapsible Bottom Menu Bar with Micro-Animation
+  const [isMenuExpanded, setIsMenuExpanded] = useState(true);
+  const menuAnim = useRef(new Animated.Value(1)).current; // 0 = collapsed circle, 1 = expanded dock
+  const hubAnim = useRef(new Animated.Value(0)).current; // Quick hub modal entrance
+
+  const toggleMenuExpansion = (expand?: boolean) => {
+    const target = expand !== undefined ? expand : !isMenuExpanded;
+    setIsMenuExpanded(target);
+    Animated.spring(menuAnim, {
+      toValue: target ? 1 : 0,
+      friction: 8,
+      tension: 45,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  useEffect(() => {
+    if (quickHubVisible) {
+      hubAnim.setValue(0);
+      Animated.spring(hubAnim, {
+        toValue: 1,
+        friction: 8,
+        tension: 50,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [quickHubVisible]);
 
   // Drag to select bottom bar tabs
   const navBarLayoutRef = useRef<{ pageX: number; width: number }>({ pageX: 16, width: 360 });
@@ -546,12 +580,72 @@ function MainScreen() {
               ) : null}
             </View>
 
-            <Text style={[styles.sectionTitle, isDark && { color: '#888F89' }]}>STUDY MATERIAL</Text>
+            {/* 1. SYLLABUS CHECKLIST (SHOWN FIRST) */}
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[styles.sectionTitle, isDark && { color: '#888F89' }]}>
+                CURRICULUM SYLLABUS ({selectedTopic.subtopics?.length || 0})
+              </Text>
+              {selectedTopic.subtopics && selectedTopic.subtopics.length > 0 && (
+                <View style={[styles.syllabusMasteredBadge, { backgroundColor: isDark ? '#1C2921' : '#E8F5E9', borderColor: isDark ? '#2E4C38' : '#A5D6A7' }]}>
+                  <Text style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 'bold', color: isDark ? '#9DE8BA' : '#16A34A' }}>
+                    {selectedTopic.subtopics.filter(s => !!checkedSubtopics[`${selectedTopic.id}_${s}`]).length} / {selectedTopic.subtopics.length} Mastered
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {selectedTopic.subtopics && selectedTopic.subtopics.length > 0 ? (
+              <View style={[styles.syllabusCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27' }]}>
+                {selectedTopic.subtopics.map((sub, idx) => {
+                  const isChecked = !!checkedSubtopics[`${selectedTopic.id}_${sub}`];
+                  return (
+                    <TouchableOpacity
+                      key={idx}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        setCheckedSubtopics(prev => ({
+                          ...prev,
+                          [`${selectedTopic.id}_${sub}`]: !prev[`${selectedTopic.id}_${sub}`],
+                        }));
+                      }}
+                      style={[
+                        styles.syllabusRow,
+                        idx > 0 && { borderTopWidth: 1, borderTopColor: isDark ? '#222624' : '#F0F1EC' },
+                      ]}
+                    >
+                      <View style={[styles.checklistIconBox, isChecked && { backgroundColor: isDark ? '#1C2921' : '#E8F5E9', borderColor: isDark ? '#2E4C38' : '#A5D6A7' }]}>
+                        {isChecked ? (
+                          <CheckIcon size={11} color={isDark ? '#9DE8BA' : '#16A34A'} />
+                        ) : (
+                          <View style={{ width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: isDark ? '#767C77' : '#8E928C' }} />
+                        )}
+                      </View>
+                      <Text
+                        style={[
+                          styles.syllabusText,
+                          { color: isDark ? (isChecked ? '#767C77' : '#E6EAE8') : (isChecked ? '#8E928C' : '#161917') },
+                          isChecked && styles.syllabusTextChecked,
+                        ]}
+                      >
+                        {sub}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ) : (
+              <View style={[styles.emptyCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27' }]}>
+                <Text style={styles.emptyText}>No syllabus subtopics attached.</Text>
+              </View>
+            )}
+
+            {/* 2. STUDY MATERIAL (SHOWN SECOND - FORMATTED MARKDOWN) */}
+            <Text style={[styles.sectionTitle, isDark && { color: '#888F89', marginTop: 18 }]}>STUDY MATERIAL</Text>
             {selectedTopic.materials && selectedTopic.materials.length > 0 ? (
               selectedTopic.materials.map((mat) => (
                 <View key={mat.id} style={[styles.materialCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27' }]}>
                   <Text style={[styles.materialTitle, isDark && { color: '#FFFFFF' }]}>{mat.title}</Text>
-                  <Text style={[styles.materialContent, isDark && { color: '#D1D5DB' }]}>{mat.content}</Text>
+                  <MarkdownView content={mat.content} isDark={isDark} />
                 </View>
               ))
             ) : (
@@ -560,7 +654,8 @@ function MainScreen() {
               </View>
             )}
 
-            <Text style={[styles.sectionTitle, isDark && { color: '#888F89' }]}>QUESTIONS & ANSWERS</Text>
+            {/* 3. QUESTIONS & ANSWERS (FORMATTED MARKDOWN SOLUTIONS) */}
+            <Text style={[styles.sectionTitle, isDark && { color: '#888F89', marginTop: 18 }]}>QUESTIONS & ANSWERS</Text>
             {selectedTopic.questions && selectedTopic.questions.length > 0 ? (
               selectedTopic.questions.map((q, idx) => (
                 <View key={q.id} style={[styles.questionCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27' }]}>
@@ -579,7 +674,7 @@ function MainScreen() {
                   </TouchableOpacity>
                   {showAnswer[q.id] && (
                     <View style={[styles.solutionBox, isDark && { backgroundColor: '#202422' }]}>
-                      <Text style={[styles.solutionText, isDark && { color: '#D1D5DB' }]}>{q.answer_text || 'No solution provided.'}</Text>
+                      <MarkdownView content={q.answer_text || 'No solution provided.'} isDark={isDark} />
                     </View>
                   )}
                 </View>
@@ -624,9 +719,11 @@ function MainScreen() {
                       onPress={() => handleToggleTopicStatus(top.id, top.user_status)}
                       style={styles.checkIconBtn}
                     >
-                      <Text style={[styles.checkIcon, isDone ? styles.checkDone : styles.checkTodo]}>
-                        isDone ? <CheckIcon size={11} color={isDark ? '#9DE8BA' : '#161917'} /> : <View style={{ width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: isDark ? '#767C77' : '#8E928C' }} />
-                      </Text>
+                      {isDone ? (
+                        <CheckIcon size={12} color={isDark ? '#9DE8BA' : '#161917'} />
+                      ) : (
+                        <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: isDark ? '#767C77' : '#8E928C' }} />
+                      )}
                     </TouchableOpacity>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.topicTitle, isDark && !isDone && { color: '#FFFFFF' }, isDone && styles.topicTitleDone]}>
@@ -688,7 +785,7 @@ function MainScreen() {
 
               {focusedTask.description ? (
                 <View style={styles.taskDescBox}>
-                  <Text style={styles.taskFocusDescription}>{focusedTask.description}</Text>
+                  <MarkdownView content={focusedTask.description} isDark={isDark} />
                 </View>
               ) : null}
             </View>
@@ -1378,7 +1475,7 @@ function MainScreen() {
         )}
       </ScrollView>
 
-      {/* 2. CENTER HOME QUICK-LAUNCH POP-UP DOCK */}
+      {/* 2. CENTER HOME QUICK-LAUNCH POP-UP DOCK WITH MICRO-ANIMATION */}
       {quickHubVisible && (
         <View style={styles.quickHubOverlay}>
           <TouchableOpacity
@@ -1386,13 +1483,28 @@ function MainScreen() {
             activeOpacity={1}
             onPress={() => setQuickHubVisible(false)}
           />
-          <View
+          <Animated.View
             style={[
               styles.quickHubCard,
               {
                 bottom: 78 + (insets.bottom > 0 ? insets.bottom : 12),
-                backgroundColor: isDark ? 'rgba(22, 26, 24, 0.97)' : 'rgba(255, 255, 255, 0.97)',
-                borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+                backgroundColor: isDark ? '#161A18' : '#FFFFFF',
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : '#D8DBD2',
+                opacity: hubAnim,
+                transform: [
+                  {
+                    translateY: hubAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [30, 0],
+                    }),
+                  },
+                  {
+                    scale: hubAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.94, 1],
+                    }),
+                  },
+                ],
               },
             ]}
           >
@@ -1417,115 +1529,94 @@ function MainScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Section A: Direct Page Navigation */}
-            <Text style={[styles.quickHubSectionTag, { color: isDark ? '#888F89' : '#70746E' }]}>SELECT PAGE</Text>
+            {/* Section A: Exclusive Quick Actions (Not in bottom menu bar) */}
+            <Text style={[styles.quickHubSectionTag, { color: isDark ? '#888F89' : '#70746E' }]}>EXCLUSIVE ACTIONS</Text>
             <View style={styles.quickHubGrid}>
-              {/* Home */}
+              {/* BYOK AI Tutor */}
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => {
                   setQuickHubVisible(false);
-                  setSelectedArea(null);
-                  setSelectedTopic(null);
-                  setFocusedTask(null);
-                  setActiveTab('Home');
+                  setProfileModalVisible(true);
                 }}
                 style={[
                   styles.quickHubItem,
                   {
-                    backgroundColor: activeTab === 'Home' && !selectedArea && !selectedTopic && !focusedTask
-                      ? (isDark ? '#2A362E' : '#E6F4EA')
-                      : (isDark ? '#202422' : '#F0F1EC'),
-                    borderColor: activeTab === 'Home' && !selectedArea && !selectedTopic && !focusedTask
-                      ? (isDark ? '#9DE8BA' : '#161917')
-                      : (isDark ? '#2E3330' : '#E2E3DC'),
+                    backgroundColor: isDark ? '#202422' : '#EFF1EA',
+                    borderColor: isDark ? '#2E3330' : '#D8DBD2',
                   },
                 ]}
               >
-                <HomeIcon size={18} color={activeTab === "Home" ? (isDark ? "#9DE8BA" : "#161917") : (isDark ? "#A3AAA4" : "#70746E")} />
-                <Text style={[styles.quickHubLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>Dashboard</Text>
-                <Text style={[styles.quickHubSub, { color: isDark ? '#A3AAA4' : '#70746E' }]}>Readiness plan</Text>
+                <ZapIcon size={18} color={isDark ? '#FCD34D' : '#D97706'} />
+                <Text style={[styles.quickHubLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>AI Tutor BYOK</Text>
+                <Text style={[styles.quickHubSub, { color: isDark ? '#A3AAA4' : '#70746E' }]}>Gemini guidance</Text>
               </TouchableOpacity>
 
-              {/* Learn */}
+              {/* Priority Workout Drill */}
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => {
                   setQuickHubVisible(false);
-                  setSelectedArea(null);
-                  setSelectedTopic(null);
-                  setFocusedTask(null);
-                  setActiveTab('Learn');
+                  if (data?.focus_areas && data.focus_areas.length > 0) {
+                    const area = data?.learning_areas_progress.find(
+                      (a) => a.id === data.focus_areas[0].area_id
+                    );
+                    if (area) handleOpenArea(area);
+                  } else {
+                    setActiveTab('Learn');
+                  }
                 }}
                 style={[
                   styles.quickHubItem,
                   {
-                    backgroundColor: activeTab === 'Learn'
-                      ? (isDark ? '#2A362E' : '#E6F4EA')
-                      : (isDark ? '#202422' : '#F0F1EC'),
-                    borderColor: activeTab === 'Learn'
-                      ? (isDark ? '#9DE8BA' : '#161917')
-                      : (isDark ? '#2E3330' : '#E2E3DC'),
+                    backgroundColor: isDark ? '#202422' : '#EFF1EA',
+                    borderColor: isDark ? '#2E3330' : '#D8DBD2',
                   },
                 ]}
               >
-                <LearnIcon size={18} color={activeTab === "Learn" ? (isDark ? "#9DE8BA" : "#161917") : (isDark ? "#A3AAA4" : "#70746E")} />
-                <Text style={[styles.quickHubLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>Learn</Text>
-                <Text style={[styles.quickHubSub, { color: isDark ? '#A3AAA4' : '#70746E' }]}>BM1 & BM2 topics</Text>
+                <CheckIcon size={18} color={isDark ? '#9DE8BA' : '#161917'} />
+                <Text style={[styles.quickHubLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>Priority Drill</Text>
+                <Text style={[styles.quickHubSub, { color: isDark ? '#A3AAA4' : '#70746E' }]}>Next weak spot</Text>
               </TouchableOpacity>
 
-              {/* Tasks */}
+              {/* Stage Simulation / Gate */}
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => {
                   setQuickHubVisible(false);
-                  setSelectedArea(null);
-                  setSelectedTopic(null);
-                  setFocusedTask(null);
-                  setActiveTab('Tasks');
+                  handleModuleClick('BM2');
                 }}
                 style={[
                   styles.quickHubItem,
                   {
-                    backgroundColor: activeTab === 'Tasks'
-                      ? (isDark ? '#2A362E' : '#E6F4EA')
-                      : (isDark ? '#202422' : '#F0F1EC'),
-                    borderColor: activeTab === 'Tasks'
-                      ? (isDark ? '#9DE8BA' : '#161917')
-                      : (isDark ? '#2E3330' : '#E2E3DC'),
+                    backgroundColor: isDark ? '#202422' : '#EFF1EA',
+                    borderColor: isDark ? '#2E3330' : '#D8DBD2',
                   },
                 ]}
               >
-                <TasksIcon size={18} color={activeTab === "Tasks" ? (isDark ? "#9DE8BA" : "#161917") : (isDark ? "#A3AAA4" : "#70746E")} />
-                <Text style={[styles.quickHubLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>Tasks</Text>
-                <Text style={[styles.quickHubSub, { color: isDark ? '#A3AAA4' : '#70746E' }]}>{allTasksList.length} workouts</Text>
+                <ToiIcon size={18} color={isDark ? '#93C5FD' : '#2563EB'} />
+                <Text style={[styles.quickHubLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>Stage Gates</Text>
+                <Text style={[styles.quickHubSub, { color: isDark ? '#A3AAA4' : '#70746E' }]}>BM1 → BM2 → TOI</Text>
               </TouchableOpacity>
 
-              {/* TOI */}
+              {/* Global Spotlight Search */}
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => {
                   setQuickHubVisible(false);
-                  setSelectedArea(null);
-                  setSelectedTopic(null);
-                  setFocusedTask(null);
-                  setActiveTab('TOI');
+                  setSearchOpen(true);
                 }}
                 style={[
                   styles.quickHubItem,
                   {
-                    backgroundColor: activeTab === 'TOI'
-                      ? (isDark ? '#2A362E' : '#E6F4EA')
-                      : (isDark ? '#202422' : '#F0F1EC'),
-                    borderColor: activeTab === 'TOI'
-                      ? (isDark ? '#9DE8BA' : '#161917')
-                      : (isDark ? '#2E3330' : '#E2E3DC'),
+                    backgroundColor: isDark ? '#202422' : '#EFF1EA',
+                    borderColor: isDark ? '#2E3330' : '#D8DBD2',
                   },
                 ]}
               >
-                <ToiIcon size={18} color={activeTab === "TOI" ? (isDark ? "#9DE8BA" : "#161917") : (isDark ? "#A3AAA4" : "#70746E")} />
-                <Text style={[styles.quickHubLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>TOI Mock</Text>
-                <Text style={[styles.quickHubSub, { color: isDark ? '#A3AAA4' : '#70746E' }]}>Interview sim</Text>
+                <SearchIcon size={18} color={isDark ? '#FFFFFF' : '#161917'} />
+                <Text style={[styles.quickHubLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>Search Index</Text>
+                <Text style={[styles.quickHubSub, { color: isDark ? '#A3AAA4' : '#70746E' }]}>Filter topics</Text>
               </TouchableOpacity>
             </View>
 
@@ -1590,220 +1681,280 @@ function MainScreen() {
                 <Text style={[styles.quickHubShortcutLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>Partner</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </Animated.View>
         </View>
       )}
 
-      {/* 3. MINIMAL FLOATING BOTTOM MENU BAR (DRAG TO SELECT + ACCORDING THEME STYLING) */}
-      <View
-        ref={navBarViewRef}
-        onLayout={measureNavBar}
-        {...bottomBarPanResponder.panHandlers}
-        style={[
-          styles.bottomNavIsland,
-          {
-            bottom: insets.bottom > 0 ? insets.bottom : 12,
-            backgroundColor: isDark ? '#161917' : '#FFFFFF',
-            borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : '#D8DBD2',
-            shadowColor: isDark ? '#000000' : '#161917',
-            shadowOpacity: isDark ? 0.45 : 0.14,
-          },
-        ]}
-      >
-        {/* Slot 1: Learn */}
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => {
-            setSelectedArea(null);
-            setSelectedTopic(null);
-            setFocusedTask(null);
-            setActiveTab('Learn');
-          }}
-          style={styles.navSlot}
+      {/* 3. COLLAPSIBLE FLOATING BOTTOM MENU BAR (COLLAPSES TO CIRCLE ORB / EXTENDS WITH MICRO-ANIMATION) */}
+      <View style={[styles.bottomNavWrapper, { bottom: insets.bottom > 0 ? insets.bottom : 12 }]}>
+        <Animated.View
+          ref={navBarViewRef}
+          onLayout={measureNavBar}
+          {...(isMenuExpanded ? bottomBarPanResponder.panHandlers : {})}
+          style={[
+            styles.bottomNavIslandAnimated,
+            {
+              backgroundColor: isDark ? '#161917' : '#FFFFFF',
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : '#D8DBD2',
+              shadowColor: isDark ? '#000000' : '#161917',
+              shadowOpacity: isDark ? 0.45 : 0.14,
+              width: menuAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [58, Math.min(Dimensions.get('window').width - 32, 440)],
+              }),
+              borderRadius: 30,
+              paddingHorizontal: menuAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [4, 8],
+              }),
+            },
+          ]}
         >
-          <View
+          {/* Left Side: Learn & Tasks (Extends with micro-animation) */}
+          <Animated.View
             style={[
-              styles.navSlotPill,
-              activeTab === 'Learn' && !selectedArea && !selectedTopic && !focusedTask
-                ? (isDark ? styles.navSlotActiveDark : styles.navSlotActiveLight)
-                : null,
+              styles.sideNavGroup,
+              {
+                opacity: menuAnim,
+                transform: [
+                  {
+                    translateX: menuAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [40, 0],
+                    }),
+                  },
+                ],
+              },
             ]}
+            pointerEvents={isMenuExpanded ? 'auto' : 'none'}
           >
-            <LearnIcon
-              size={18}
-              color={
-                activeTab === 'Learn' && !selectedArea && !selectedTopic && !focusedTask
-                  ? (isDark ? '#9DE8BA' : '#161917')
-                  : (isDark ? '#8E958F' : '#636964')
-              }
-            />
-            <Text
-              style={[
-                styles.navLabel,
-                activeTab === 'Learn' && !selectedArea && !selectedTopic && !focusedTask
-                  ? (isDark ? styles.navLabelActiveDark : styles.navLabelActiveLight)
-                  : (isDark ? styles.navLabelInactiveDark : styles.navLabelInactiveLight),
-              ]}
+            {/* Slot 1: Learn */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setSelectedArea(null);
+                setSelectedTopic(null);
+                setFocusedTask(null);
+                setActiveTab('Learn');
+              }}
+              style={styles.navSlot}
             >
-              Learn
-            </Text>
-          </View>
-        </TouchableOpacity>
+              <View
+                style={[
+                  styles.navSlotPill,
+                  activeTab === 'Learn' && !selectedArea && !selectedTopic && !focusedTask
+                    ? (isDark ? styles.navSlotActiveDark : styles.navSlotActiveLight)
+                    : null,
+                ]}
+              >
+                <LearnIcon
+                  size={17}
+                  color={
+                    activeTab === 'Learn' && !selectedArea && !selectedTopic && !focusedTask
+                      ? (isDark ? '#9DE8BA' : '#161917')
+                      : (isDark ? '#8E958F' : '#636964')
+                  }
+                />
+                <Text
+                  style={[
+                    styles.navLabel,
+                    activeTab === 'Learn' && !selectedArea && !selectedTopic && !focusedTask
+                      ? (isDark ? styles.navLabelActiveDark : styles.navLabelActiveLight)
+                      : (isDark ? styles.navLabelInactiveDark : styles.navLabelInactiveLight),
+                  ]}
+                >
+                  Learn
+                </Text>
+              </View>
+            </TouchableOpacity>
 
-        {/* Slot 2: Tasks */}
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => {
-            setSelectedArea(null);
-            setSelectedTopic(null);
-            setFocusedTask(null);
-            setActiveTab('Tasks');
-          }}
-          style={styles.navSlot}
-        >
-          <View
-            style={[
-              styles.navSlotPill,
-              activeTab === 'Tasks' && !focusedTask
-                ? (isDark ? styles.navSlotActiveDark : styles.navSlotActiveLight)
-                : null,
-            ]}
-          >
-            <TasksIcon
-              size={18}
-              color={
-                activeTab === 'Tasks' && !focusedTask
-                  ? (isDark ? '#9DE8BA' : '#161917')
-                  : (isDark ? '#8E958F' : '#636964')
-              }
-            />
-            <Text
-              style={[
-                styles.navLabel,
-                activeTab === 'Tasks' && !focusedTask
-                  ? (isDark ? styles.navLabelActiveDark : styles.navLabelActiveLight)
-                  : (isDark ? styles.navLabelInactiveDark : styles.navLabelInactiveLight),
-              ]}
+            {/* Slot 2: Tasks */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setSelectedArea(null);
+                setSelectedTopic(null);
+                setFocusedTask(null);
+                setActiveTab('Tasks');
+              }}
+              style={styles.navSlot}
             >
-              Tasks
-            </Text>
-          </View>
-        </TouchableOpacity>
+              <View
+                style={[
+                  styles.navSlotPill,
+                  activeTab === 'Tasks' && !focusedTask
+                    ? (isDark ? styles.navSlotActiveDark : styles.navSlotActiveLight)
+                    : null,
+                ]}
+              >
+                <TasksIcon
+                  size={17}
+                  color={
+                    activeTab === 'Tasks' && !focusedTask
+                      ? (isDark ? '#9DE8BA' : '#161917')
+                      : (isDark ? '#8E958F' : '#636964')
+                  }
+                />
+                <Text
+                  style={[
+                    styles.navLabel,
+                    activeTab === 'Tasks' && !focusedTask
+                      ? (isDark ? styles.navLabelActiveDark : styles.navLabelActiveLight)
+                      : (isDark ? styles.navLabelInactiveDark : styles.navLabelInactiveLight),
+                  ]}
+                >
+                  Tasks
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
 
-        {/* Slot 3: CENTER HOME BUTTON (Hero Island Hub) */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => {
-            if (activeTab === 'Home' && !selectedArea && !selectedTopic && !focusedTask) {
-              setQuickHubVisible(!quickHubVisible);
-            } else {
-              setSelectedArea(null);
-              setSelectedTopic(null);
-              setFocusedTask(null);
-              setActiveTab('Home');
-            }
-          }}
-          onLongPress={() => setQuickHubVisible(true)}
-          style={styles.navCenterHubSlot}
-        >
-          <View
-            style={[
-              styles.navCenterHubBtn,
-              activeTab === 'Home' && !selectedArea && !selectedTopic && !focusedTask
-                ? (isDark ? styles.navCenterHubActiveDark : styles.navCenterHubActiveLight)
-                : (isDark ? styles.navCenterHubInactiveDark : styles.navCenterHubInactiveLight),
-            ]}
+          {/* Center: CIRCLE HOME ORB (Tap to navigate/hub, Hold to extend/collapse menu) */}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => {
+              if (!isMenuExpanded) {
+                // When collapsed, tapping extends the menu bar with spring micro-animation!
+                toggleMenuExpansion(true);
+              } else if (activeTab === 'Home' && !selectedArea && !selectedTopic && !focusedTask) {
+                // When already on Home and expanded, open exclusive Quick Hub
+                setQuickHubVisible(true);
+              } else {
+                setSelectedArea(null);
+                setSelectedTopic(null);
+                setFocusedTask(null);
+                setActiveTab('Home');
+              }
+            }}
+            onLongPress={() => {
+              // Holding expands or collapses the menu bar smoothly!
+              toggleMenuExpansion();
+            }}
+            delayLongPress={220}
+            style={styles.navCenterHubSlot}
           >
-            <HomeIcon
-              size={21}
-              color={
+            <View
+              style={[
+                styles.navCenterHubBtn,
                 activeTab === 'Home' && !selectedArea && !selectedTopic && !focusedTask
-                  ? (isDark ? '#0D381E' : '#FFFFFF')
-                  : (isDark ? '#E2E8F0' : '#161917')
-              }
-            />
-          </View>
-        </TouchableOpacity>
-
-        {/* Slot 4: TOI */}
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => {
-            setSelectedArea(null);
-            setSelectedTopic(null);
-            setFocusedTask(null);
-            setActiveTab('TOI');
-          }}
-          style={styles.navSlot}
-        >
-          <View
-            style={[
-              styles.navSlotPill,
-              activeTab === 'TOI'
-                ? (isDark ? styles.navSlotActiveDark : styles.navSlotActiveLight)
-                : null,
-            ]}
-          >
-            <ToiIcon
-              size={18}
-              color={
-                activeTab === 'TOI'
-                  ? (isDark ? '#9DE8BA' : '#161917')
-                  : (isDark ? '#8E958F' : '#636964')
-              }
-            />
-            <Text
-              style={[
-                styles.navLabel,
-                activeTab === 'TOI'
-                  ? (isDark ? styles.navLabelActiveDark : styles.navLabelActiveLight)
-                  : (isDark ? styles.navLabelInactiveDark : styles.navLabelInactiveLight),
+                  ? (isDark ? styles.navCenterHubActiveDark : styles.navCenterHubActiveLight)
+                  : (isDark ? styles.navCenterHubInactiveDark : styles.navCenterHubInactiveLight),
+                !isMenuExpanded && styles.navCenterOrbCollapsed,
               ]}
             >
-              TOI
-            </Text>
-          </View>
-        </TouchableOpacity>
+              <HomeIcon
+                size={20}
+                color={
+                  activeTab === 'Home' && !selectedArea && !selectedTopic && !focusedTask
+                    ? (isDark ? '#0D381E' : '#FFFFFF')
+                    : (isDark ? '#E2E8F0' : '#161917')
+                }
+              />
+              {!isMenuExpanded && (
+                <View style={[styles.orbPulseDot, { backgroundColor: isDark ? '#9DE8BA' : '#161917' }]} />
+              )}
+            </View>
+          </TouchableOpacity>
 
-        {/* Slot 5: Progress */}
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => {
-            setSelectedArea(null);
-            setSelectedTopic(null);
-            setFocusedTask(null);
-            setActiveTab('Progress');
-          }}
-          style={styles.navSlot}
-        >
-          <View
+          {/* Right Side: TOI & Progress (Extends with micro-animation) */}
+          <Animated.View
             style={[
-              styles.navSlotPill,
-              activeTab === 'Progress'
-                ? (isDark ? styles.navSlotActiveDark : styles.navSlotActiveLight)
-                : null,
+              styles.sideNavGroup,
+              {
+                opacity: menuAnim,
+                transform: [
+                  {
+                    translateX: menuAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-40, 0],
+                    }),
+                  },
+                ],
+              },
             ]}
+            pointerEvents={isMenuExpanded ? 'auto' : 'none'}
           >
-            <StatsIcon
-              size={18}
-              color={
-                activeTab === 'Progress'
-                  ? (isDark ? '#9DE8BA' : '#161917')
-                  : (isDark ? '#8E958F' : '#636964')
-              }
-            />
-            <Text
-              style={[
-                styles.navLabel,
-                activeTab === 'Progress'
-                  ? (isDark ? styles.navLabelActiveDark : styles.navLabelActiveLight)
-                  : (isDark ? styles.navLabelInactiveDark : styles.navLabelInactiveLight),
-              ]}
+            {/* Slot 4: TOI */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setSelectedArea(null);
+                setSelectedTopic(null);
+                setFocusedTask(null);
+                setActiveTab('TOI');
+              }}
+              style={styles.navSlot}
             >
-              Stats
-            </Text>
-          </View>
-        </TouchableOpacity>
+              <View
+                style={[
+                  styles.navSlotPill,
+                  activeTab === 'TOI'
+                    ? (isDark ? styles.navSlotActiveDark : styles.navSlotActiveLight)
+                    : null,
+                ]}
+              >
+                <ToiIcon
+                  size={17}
+                  color={
+                    activeTab === 'TOI'
+                      ? (isDark ? '#9DE8BA' : '#161917')
+                      : (isDark ? '#8E958F' : '#636964')
+                  }
+                />
+                <Text
+                  style={[
+                    styles.navLabel,
+                    activeTab === 'TOI'
+                      ? (isDark ? styles.navLabelActiveDark : styles.navLabelActiveLight)
+                      : (isDark ? styles.navLabelInactiveDark : styles.navLabelInactiveLight),
+                  ]}
+                >
+                  TOI
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Slot 5: Progress / Stats */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setSelectedArea(null);
+                setSelectedTopic(null);
+                setFocusedTask(null);
+                setActiveTab('Progress');
+              }}
+              style={styles.navSlot}
+            >
+              <View
+                style={[
+                  styles.navSlotPill,
+                  activeTab === 'Progress'
+                    ? (isDark ? styles.navSlotActiveDark : styles.navSlotActiveLight)
+                    : null,
+                ]}
+              >
+                <StatsIcon
+                  size={17}
+                  color={
+                    activeTab === 'Progress'
+                      ? (isDark ? '#9DE8BA' : '#161917')
+                      : (isDark ? '#8E958F' : '#636964')
+                  }
+                />
+                <Text
+                  style={[
+                    styles.navLabel,
+                    activeTab === 'Progress'
+                      ? (isDark ? styles.navLabelActiveDark : styles.navLabelActiveLight)
+                      : (isDark ? styles.navLabelInactiveDark : styles.navLabelInactiveLight),
+                  ]}
+                >
+                  Stats
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
+        </Animated.View>
       </View>
 
       {/* PROFILE & SETTINGS MODAL (Triggered by Circular Profile Avatar) */}
@@ -3060,6 +3211,91 @@ const styles = StyleSheet.create({
   },
   navLabelInactiveLight: {
     color: '#636964',
+  },
+
+  // Syllabus Checklist in Topic Detail
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  syllabusMasteredBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  syllabusCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E2E3DC',
+    overflow: 'hidden',
+  },
+  syllabusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    gap: 12,
+  },
+  checklistIconBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#D8DBD2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  syllabusText: {
+    fontSize: 13,
+    fontWeight: '500',
+    flex: 1,
+    lineHeight: 18,
+  },
+  syllabusTextChecked: {
+    textDecorationLine: 'line-through',
+  },
+
+  // Collapsible Floating Bottom Menu Bar Styles
+  bottomNavWrapper: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 90,
+  },
+  bottomNavIslandAnimated: {
+    height: 60,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    overflow: 'hidden',
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 18,
+    elevation: 12,
+  },
+  sideNavGroup: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  navCenterOrbCollapsed: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  orbPulseDot: {
+    position: 'absolute',
+    bottom: 3,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
   },
 
   // Center Home Hub Button

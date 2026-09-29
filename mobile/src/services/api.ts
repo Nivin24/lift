@@ -24,6 +24,7 @@ export interface MobileTopicDetail {
   estimated_minutes: number;
   user_status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
   notes?: string;
+  subtopics?: string[];
   materials: Array<{ id: number; title: string; content: string }>;
   questions: Array<{ id: number; question_text: string; answer_text?: string; question_type: string; difficulty: string }>;
   tasks: Task[];

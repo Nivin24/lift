@@ -43,7 +43,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
 }) => {
   const [topic, setTopic] = useState<TopicDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'material' | 'subtopics' | 'questions' | 'tasks' | 'resources' | 'notes'>('material');
+  const [activeTab, setActiveTab] = useState<'subtopics' | 'material' | 'questions' | 'tasks' | 'resources' | 'notes'>('subtopics');
   const [personalNotes, setPersonalNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
   const [notesSavedAlert, setNotesSavedAlert] = useState(false);
@@ -299,18 +299,6 @@ export const TopicView: React.FC<TopicViewProps> = ({
       {/* Modern Pill Tabs Navigation */}
       <div className="flex items-center space-x-1.5 p-1.5 bg-[#F0F1EC] dark:bg-[#202422] rounded-full border border-[#E3E5DE] dark:border-[#2E3330] overflow-x-auto text-xs font-mono">
         <button
-          onClick={() => setActiveTab('material')}
-          className={`flex items-center space-x-1.5 px-4 py-2 rounded-full transition-all whitespace-nowrap ${
-            activeTab === 'material'
-              ? 'bg-white dark:bg-[#161917] text-[#161917] dark:text-white font-bold shadow-xs'
-              : 'text-[#5C625D] dark:text-[#A3AAA4] hover:text-[#161917] dark:hover:text-white font-medium'
-          }`}
-        >
-          <BookOpen className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-          <span>Study Material ({topic.materials.length})</span>
-        </button>
-
-        <button
           onClick={() => setActiveTab('subtopics')}
           className={`flex items-center space-x-1.5 px-4 py-2 rounded-full transition-all whitespace-nowrap ${
             activeTab === 'subtopics'
@@ -320,6 +308,18 @@ export const TopicView: React.FC<TopicViewProps> = ({
         >
           <ListChecks className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
           <span>Syllabus ({topic.subtopics?.length || 0})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('material')}
+          className={`flex items-center space-x-1.5 px-4 py-2 rounded-full transition-all whitespace-nowrap ${
+            activeTab === 'material'
+              ? 'bg-white dark:bg-[#161917] text-[#161917] dark:text-white font-bold shadow-xs'
+              : 'text-[#5C625D] dark:text-[#A3AAA4] hover:text-[#161917] dark:hover:text-white font-medium'
+          }`}
+        >
+          <BookOpen className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+          <span>Study Material ({topic.materials.length})</span>
         </button>
 
         <button
