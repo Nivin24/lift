@@ -1,12 +1,22 @@
-# LIFT — Learning, Implementation & Focus Tracker
-### The Personal Command Center for Brototype Boarding Modules & TOI Preparation
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="mobile/assets/logo-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="mobile/assets/logo-light.png">
+    <img alt="LIFT Logo" src="mobile/assets/logo-dark.png" width="96" height="96" style="border-radius: 20px;">
+  </picture>
 
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110.0-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![React](https://img.shields.io/badge/React-19.0.0-61DAFB.svg?logo=react&logoColor=black)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-v4-38B2AC.svg?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Expo](https://img.shields.io/badge/Expo-52.0.0-000020.svg?logo=expo&logoColor=white)](https://expo.dev/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-4169E1.svg?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+  <h1>LIFT — Learning, Implementation & Focus Tracker</h1>
+  <p><strong>The Personal Command Center for Brototype Boarding Modules & TOI Preparation</strong></p>
+
+  <p>
+    <a href="https://fastapi.tiangolo.com"><img src="https://img.shields.io/badge/FastAPI-0.110.0-009688.svg?logo=fastapi&logoColor=white" alt="FastAPI" /></a>
+    <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-19.0.0-61DAFB.svg?logo=react&logoColor=black" alt="React" /></a>
+    <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.6-3178C6.svg?logo=typescript&logoColor=white" alt="TypeScript" /></a>
+    <a href="https://tailwindcss.com/"><img src="https://img.shields.io/badge/TailwindCSS-v4-38B2AC.svg?logo=tailwind-css&logoColor=white" alt="Tailwind CSS" /></a>
+    <a href="https://expo.dev/"><img src="https://img.shields.io/badge/Expo-52.0.0-000020.svg?logo=expo&logoColor=white" alt="Expo" /></a>
+    <a href="https://www.postgresql.org/"><img src="https://img.shields.io/badge/PostgreSQL-15+-4169E1.svg?logo=postgresql&logoColor=white" alt="PostgreSQL" /></a>
+  </p>
+</div>
 
 ---
 
