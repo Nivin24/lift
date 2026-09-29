@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "LIFT",
+    "slug": "lift-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#090B10",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.lift.prep"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#090B10"
+      },
+      "package": "com.lift.prep"
+    }
+  }
+}
