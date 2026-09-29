@@ -40,6 +40,17 @@ function MainScreen() {
   const [allTasksList, setAllTasksList] = useState<Task[]>([]);
   const [focusedTaskQuestions, setFocusedTaskQuestions] = useState<Array<{ id: number; question_text: string; answer_text?: string; question_type: string; difficulty: string }>>([]);
 
+  // Theme state: dark (default matching web workspace) | light
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const isDark = theme === 'dark';
+
+  // Center Home Quick Actions Dock state
+  const [quickHubVisible, setQuickHubVisible] = useState(false);
+
+  // In-Island Search state
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Self-Analytics & Pacing State
   const [analyticsData, setAnalyticsData] = useState<AnalyticsOverview | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -300,35 +311,102 @@ function MainScreen() {
 
   const tasksToDisplay = allTasksList.length > 0 ? allTasksList : data?.pending_tasks || [];
   const filteredTasks = tasksToDisplay.filter((t) => {
-    if (taskFilter === 'ALL') return true;
-    return t.user_status === taskFilter;
+    const matchesFilter = taskFilter === 'ALL' || t.user_status === taskFilter;
+    if (!matchesFilter) return false;
+    if (searchQuery.trim().length === 0) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      t.title.toLowerCase().includes(q) ||
+      (t.description || '').toLowerCase().includes(q) ||
+      (t.module_code || '').toLowerCase().includes(q) ||
+      (t.task_type || '').toLowerCase().includes(q)
+    );
   });
 
   // User initials for the circular avatar
   const userInitial = (currentUser?.full_name || currentUser?.username || 'U').charAt(0).toUpperCase();
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#0B0D0C' : '#F0F1EC' }]} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      {/* Top Header with Circled Clickable Profile Icon */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.brandTitle}>LIFT WORKSPACE</Text>
-          <Text style={styles.brandSubtitle}>BM1 → BM2 → TOI</Text>
+      {/* 1. TOP FLOATING ISLAND NAVIGATION */}
+      <View style={[styles.topIsland, { backgroundColor: isDark ? 'rgba(22, 25, 23, 0.94)' : 'rgba(255, 255, 255, 0.94)', borderColor: isDark ? '#262A27' : '#E2E3DC' }]}>
+        <View style={styles.topIslandRow}>
+          {/* Brand & Stage cluster */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              setSelectedArea(null);
+              setSelectedTopic(null);
+              setFocusedTask(null);
+              setActiveTab('Home');
+            }}
+            style={styles.topBrandCluster}
+          >
+            <View style={[styles.topBrandLogo, { backgroundColor: isDark ? '#9DE8BA' : '#161917' }]}>
+              <Text style={[styles.topBrandLogoText, { color: isDark ? '#0D381E' : '#FFFFFF' }]}>▲</Text>
+            </View>
+            <View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={[styles.topBrandName, { color: isDark ? '#FFFFFF' : '#161917' }]}>LIFT</Text>
+                <View style={[styles.topStageBadge, { backgroundColor: isDark ? '#202422' : '#F0F1EC', borderColor: isDark ? '#2E3330' : '#E2E3DC' }]}>
+                  <View style={styles.topStageDot} />
+                  <Text style={[styles.topStageText, { color: isDark ? '#9DE8BA' : '#161917' }]}>BM1</Text>
+                </View>
+              </View>
+            </View>
+          </TouchableOpacity>
+
+          {/* Action cluster: Search | Theme Toggle | Profile */}
+          <View style={styles.topActionCluster}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setSearchOpen(!searchOpen)}
+              style={[styles.topIconBtn, { backgroundColor: searchOpen ? (isDark ? '#2E3330' : '#E2E3DC') : (isDark ? '#202422' : '#F0F1EC'), borderColor: isDark ? '#2E3330' : '#E2E3DC' }]}
+            >
+              <Text style={[styles.topIconSymbol, { color: isDark ? '#FFFFFF' : '#161917' }]}>🔍</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setTheme(isDark ? 'light' : 'dark')}
+              style={[styles.topIconBtn, { backgroundColor: isDark ? '#202422' : '#F0F1EC', borderColor: isDark ? '#2E3330' : '#E2E3DC' }]}
+            >
+              <Text style={[styles.topIconSymbol, { color: isDark ? '#FCE8A6' : '#634800' }]}>{isDark ? '🌙' : '☀️'}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setProfileModalVisible(true)}
+              style={styles.profileCircleBtn}
+            >
+              <View style={[styles.profileCircleInner, { backgroundColor: isDark ? '#262A27' : '#161917', borderColor: isDark ? '#363C38' : '#FFFFFF', borderWidth: 1 }]}>
+                <Text style={styles.profileInitialText}>{userInitial}</Text>
+              </View>
+              <View style={styles.activeDot} />
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Circular Clickable Profile Icon */}
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => setProfileModalVisible(true)}
-          style={styles.profileCircleBtn}
-        >
-          <View style={styles.profileCircleInner}>
-            <Text style={styles.profileInitialText}>{userInitial}</Text>
+        {/* Collapsible Search Input inside the island */}
+        {searchOpen && (
+          <View style={[styles.topSearchBox, { borderTopColor: isDark ? '#262A27' : '#E2E3DC' }]}>
+            <TextInput
+              placeholder="Filter topics, tasks, workouts..."
+              placeholderTextColor={isDark ? '#767C77' : '#8E928C'}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              style={[styles.topSearchInput, { color: isDark ? '#FFFFFF' : '#161917', backgroundColor: isDark ? '#161917' : '#FFFFFF', borderColor: isDark ? '#2E3330' : '#E2E3DC' }]}
+              autoFocus
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.topSearchClearBtn}>
+                <Text style={{ color: isDark ? '#A3AAA4' : '#70746E', fontSize: 12, fontWeight: 'bold' }}>✕</Text>
+              </TouchableOpacity>
+            )}
           </View>
-          <View style={styles.activeDot} />
-        </TouchableOpacity>
+        )}
       </View>
 
       {/* Main Content Area */}
@@ -343,10 +421,10 @@ function MainScreen() {
               onPress={() => setSelectedTopic(null)}
               style={styles.backButtonContainer}
             >
-              <Text style={styles.backButtonText}>← Back to {selectedArea?.title || 'Topics'}</Text>
+              <Text style={[styles.backButtonText, isDark && { color: '#FFFFFF' }]}>← Back to {selectedArea?.title || 'Topics'}</Text>
             </TouchableOpacity>
 
-            <View style={styles.overviewCard}>
+            <View style={[styles.overviewCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27', borderWidth: 1 }]}>
               <View style={styles.cardRow}>
                 <Text style={styles.moduleTag}>{selectedTopic.module_code} • {selectedTopic.difficulty}</Text>
                 <TouchableOpacity
@@ -367,40 +445,40 @@ function MainScreen() {
               ) : null}
             </View>
 
-            <Text style={styles.sectionTitle}>STUDY MATERIAL</Text>
+            <Text style={[styles.sectionTitle, isDark && { color: '#888F89' }]}>STUDY MATERIAL</Text>
             {selectedTopic.materials && selectedTopic.materials.length > 0 ? (
               selectedTopic.materials.map((mat) => (
-                <View key={mat.id} style={styles.materialCard}>
-                  <Text style={styles.materialTitle}>{mat.title}</Text>
-                  <Text style={styles.materialContent}>{mat.content}</Text>
+                <View key={mat.id} style={[styles.materialCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27' }]}>
+                  <Text style={[styles.materialTitle, isDark && { color: '#FFFFFF' }]}>{mat.title}</Text>
+                  <Text style={[styles.materialContent, isDark && { color: '#D1D5DB' }]}>{mat.content}</Text>
                 </View>
               ))
             ) : (
-              <View style={styles.emptyCard}>
+              <View style={[styles.emptyCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27' }]}>
                 <Text style={styles.emptyText}>No study notes attached.</Text>
               </View>
             )}
 
-            <Text style={styles.sectionTitle}>QUESTIONS & ANSWERS</Text>
+            <Text style={[styles.sectionTitle, isDark && { color: '#888F89' }]}>QUESTIONS & ANSWERS</Text>
             {selectedTopic.questions && selectedTopic.questions.length > 0 ? (
               selectedTopic.questions.map((q, idx) => (
-                <View key={q.id} style={styles.questionCard}>
+                <View key={q.id} style={[styles.questionCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27' }]}>
                   <View style={styles.cardRow}>
                     <Text style={styles.questionNum}>QUESTION #{idx + 1}</Text>
                     <Text style={styles.badgeSmall}>{q.difficulty || 'INTERMEDIATE'}</Text>
                   </View>
-                  <Text style={styles.questionText}>{q.question_text}</Text>
+                  <Text style={[styles.questionText, isDark && { color: '#FFFFFF' }]}>{q.question_text}</Text>
                   <TouchableOpacity
                     onPress={() => setShowAnswer((prev) => ({ ...prev, [q.id]: !prev[q.id] }))}
                     style={styles.revealBtn}
                   >
-                    <Text style={styles.revealBtnText}>
+                    <Text style={[styles.revealBtnText, isDark && { color: '#9DE8BA' }]}>
                       {showAnswer[q.id] ? '▲ Hide Solution' : '▼ Reveal Solution'}
                     </Text>
                   </TouchableOpacity>
                   {showAnswer[q.id] && (
-                    <View style={styles.solutionBox}>
-                      <Text style={styles.solutionText}>{q.answer_text || 'No solution provided.'}</Text>
+                    <View style={[styles.solutionBox, isDark && { backgroundColor: '#202422' }]}>
+                      <Text style={[styles.solutionText, isDark && { color: '#D1D5DB' }]}>{q.answer_text || 'No solution provided.'}</Text>
                     </View>
                   )}
                 </View>
@@ -414,10 +492,10 @@ function MainScreen() {
               onPress={() => setSelectedArea(null)}
               style={styles.backButtonContainer}
             >
-              <Text style={styles.backButtonText}>← Back to Learning Areas</Text>
+              <Text style={[styles.backButtonText, isDark && { color: '#FFFFFF' }]}>← Back to Learning Areas</Text>
             </TouchableOpacity>
 
-            <View style={styles.overviewCard}>
+            <View style={[styles.overviewCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27', borderWidth: 1 }]}>
               <Text style={styles.cardHeaderSmall}>{selectedArea.module_code} CURRICULUM</Text>
               <Text style={styles.topicDetailTitle}>{selectedArea.title}</Text>
               <Text style={styles.topicDetailDesc}>{selectedArea.description}</Text>
@@ -429,7 +507,7 @@ function MainScreen() {
               </View>
             </View>
 
-            <Text style={styles.sectionTitle}>TOPICS (TAP TO OPEN)</Text>
+            <Text style={[styles.sectionTitle, isDark && { color: '#888F89' }]}>TOPICS (TAP TO OPEN)</Text>
             {loadingTopics ? (
               <ActivityIndicator color="#38bdf8" style={{ marginTop: 20 }} />
             ) : (
@@ -439,7 +517,7 @@ function MainScreen() {
                   <TouchableOpacity
                     key={top.id}
                     onPress={() => handleOpenTopic(top.id)}
-                    style={styles.topicRowCard}
+                    style={[styles.topicRowCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27' }]}
                   >
                     <TouchableOpacity
                       onPress={() => handleToggleTopicStatus(top.id, top.user_status)}
@@ -450,11 +528,11 @@ function MainScreen() {
                       </Text>
                     </TouchableOpacity>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.topicTitle, isDone && styles.topicTitleDone]}>
+                      <Text style={[styles.topicTitle, isDark && !isDone && { color: '#FFFFFF' }, isDone && styles.topicTitleDone]}>
                         {top.title}
                       </Text>
                       {top.summary ? (
-                        <Text style={styles.topicSummary} numberOfLines={1}>
+                        <Text style={[styles.topicSummary, isDark && { color: '#A3AAA4' }]} numberOfLines={1}>
                           {top.summary}
                         </Text>
                       ) : null}
@@ -472,11 +550,11 @@ function MainScreen() {
               onPress={() => setFocusedTask(null)}
               style={styles.backButtonContainer}
             >
-              <Text style={styles.backButtonText}>← Back to Task List</Text>
+              <Text style={[styles.backButtonText, isDark && { color: '#FFFFFF' }]}>← Back to Task List</Text>
             </TouchableOpacity>
 
             {/* High Readability Task Detail Focus Card */}
-            <View style={styles.taskFocusHeroCard}>
+            <View style={[styles.taskFocusHeroCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27', borderWidth: 1 }]}>
               <View style={styles.cardRow}>
                 <View style={styles.tagGroup}>
                   <Text style={styles.taskTypeBadge}>{focusedTask.task_type}</Text>
@@ -509,7 +587,7 @@ function MainScreen() {
 
             {/* Questions & Answers Section Formatted as Readable Cards */}
             <View style={styles.qaSectionHeader}>
-              <Text style={styles.sectionTitle}>PRACTICE & INTERVIEW QUESTIONS</Text>
+              <Text style={[styles.sectionTitle, isDark && { color: '#888F89' }]}>PRACTICE & INTERVIEW QUESTIONS</Text>
               <Text style={styles.subtextSmall}>Card-based self-testing for this task</Text>
             </View>
 
@@ -517,38 +595,38 @@ function MainScreen() {
               focusedTaskQuestions.map((q, qIndex) => {
                 const isRevealed = !!showAnswer[q.id];
                 return (
-                  <View key={q.id} style={styles.qaCard}>
+                  <View key={q.id} style={[styles.qaCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27' }]}>
                     <View style={styles.cardRow}>
-                      <Text style={styles.qaCardNumber}>QUESTION #{qIndex + 1}</Text>
+                      <Text style={[styles.qaCardNumber, isDark && { color: '#FFFFFF' }]}>QUESTION #{qIndex + 1}</Text>
                       <View style={styles.tagGroup}>
                         <Text style={styles.qaTypeTag}>{q.question_type}</Text>
                         <Text style={styles.qaDiffTag}>{q.difficulty || 'INTERMEDIATE'}</Text>
                       </View>
                     </View>
 
-                    <Text style={styles.qaQuestionPrompt}>{q.question_text}</Text>
+                    <Text style={[styles.qaQuestionPrompt, isDark && { color: '#FFFFFF' }]}>{q.question_text}</Text>
 
                     <TouchableOpacity
                       activeOpacity={0.7}
                       onPress={() => setShowAnswer((prev) => ({ ...prev, [q.id]: !prev[q.id] }))}
-                      style={[styles.qaRevealButton, isRevealed && styles.qaRevealButtonActive]}
+                      style={[styles.qaRevealButton, isRevealed && styles.qaRevealButtonActive, isDark && { backgroundColor: isRevealed ? '#2E3330' : '#202422' }]}
                     >
-                      <Text style={styles.qaRevealButtonText}>
+                      <Text style={[styles.qaRevealButtonText, isDark && { color: '#9DE8BA' }]}>
                         {isRevealed ? '▲ Hide Authoritative Solution' : '▼ Reveal Authoritative Solution'}
                       </Text>
                     </TouchableOpacity>
 
                     {isRevealed && (
-                      <View style={styles.qaSolutionContainer}>
+                      <View style={[styles.qaSolutionContainer, isDark && { backgroundColor: '#202422' }]}>
                         <Text style={styles.qaSolutionLabel}>SOLUTION & BREAKDOWN:</Text>
-                        <Text style={styles.qaSolutionBody}>{q.answer_text || 'No solution text provided.'}</Text>
+                        <Text style={[styles.qaSolutionBody, isDark && { color: '#D1D5DB' }]}>{q.answer_text || 'No solution text provided.'}</Text>
                       </View>
                     )}
                   </View>
                 );
               })
             ) : (
-              <View style={styles.emptyCard}>
+              <View style={[styles.emptyCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27' }]}>
                 <Text style={styles.emptyTitle}>Self-Assessment Questions</Text>
                 <Text style={styles.emptyText}>
                   Use the Web Workspace AI Generator to draft instant interview & practice question cards for this topic.
@@ -567,15 +645,15 @@ function MainScreen() {
               <Text style={styles.backButtonText}>← Back to Dashboard</Text>
             </TouchableOpacity>
 
-            <View style={styles.overviewCard}>
+            <View style={[styles.overviewCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27' }]}>
               <View style={styles.cardRow}>
                 <Text style={styles.cardHeaderSmall}>TASKS & PRACTICE WORKSPACE</Text>
-                <Text style={styles.statValue}>
+                <Text style={[styles.statValue, isDark && { color: '#FFFFFF' }]}>
                   {allTasksList.filter((t) => t.user_status === 'COMPLETED').length}/{allTasksList.length} Done
                 </Text>
               </View>
-              <Text style={styles.topicDetailTitle}>Action Items & Challenges</Text>
-              <Text style={styles.topicDetailDesc}>
+              <Text style={[styles.topicDetailTitle, isDark && { color: '#FFFFFF' }]}>Action Items & Challenges</Text>
+              <Text style={[styles.topicDetailDesc, isDark && { color: '#A3AAA4' }]}>
                 Tap any task card to focus, view its detailed specification, and practice related question cards.
               </Text>
             </View>
@@ -586,16 +664,26 @@ function MainScreen() {
                 <TouchableOpacity
                   key={filter}
                   onPress={() => setTaskFilter(filter)}
-                  style={[styles.filterPill, taskFilter === filter && styles.filterPillActive]}
+                  style={[
+                    styles.filterPill,
+                    isDark && { backgroundColor: '#202422', borderColor: '#2E3330' },
+                    taskFilter === filter && (isDark ? { backgroundColor: '#9DE8BA', borderColor: '#9DE8BA' } : styles.filterPillActive),
+                  ]}
                 >
-                  <Text style={[styles.filterPillText, taskFilter === filter && styles.filterPillTextActive]}>
+                  <Text
+                    style={[
+                      styles.filterPillText,
+                      isDark && { color: '#A3AAA4' },
+                      taskFilter === filter && (isDark ? { color: '#0D381E', fontWeight: 'bold' } : styles.filterPillTextActive),
+                    ]}
+                  >
                     {filter === 'ALL' ? 'All Tasks' : filter === 'TODO' ? 'Pending' : 'Completed'}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={styles.sectionTitle}>
+            <Text style={[styles.sectionTitle, isDark && { color: '#888F89' }]}>
               {taskFilter === 'ALL' ? 'ALL TASKS' : taskFilter === 'TODO' ? 'PENDING TASKS' : 'COMPLETED TASKS'} ({filteredTasks.length})
             </Text>
 
@@ -607,7 +695,11 @@ function MainScreen() {
                     key={task.id}
                     activeOpacity={0.7}
                     onPress={() => handleOpenTaskFocus(task)}
-                    style={[styles.taskCard, isDone && styles.taskCardDone]}
+                    style={[
+                      styles.taskCard,
+                      isDark && { backgroundColor: '#161917', borderColor: '#262A27' },
+                      isDone && (isDark ? { borderColor: '#1F3325', opacity: 0.8 } : styles.taskCardDone),
+                    ]}
                   >
                     <View style={styles.cardRow}>
                       <View style={styles.tagGroup}>
@@ -621,31 +713,32 @@ function MainScreen() {
                         onPress={() => handleToggleTaskStatus(task)}
                         style={styles.taskToggleInline}
                       >
-                        <Text style={[styles.checkIcon, isDone ? styles.checkDone : styles.checkTodo]}>
+                        <Text style={[styles.checkIcon, isDone ? (isDark ? { color: '#9DE8BA' } : styles.checkDone) : styles.checkTodo]}>
                           {isDone ? '✓' : '○'}
                         </Text>
                       </TouchableOpacity>
                     </View>
 
-                    <Text style={[styles.taskTitle, isDone && styles.taskTitleDone]}>
+                    <Text style={[styles.taskTitle, isDark && { color: '#FFFFFF' }, isDone && (isDark ? { color: '#767C77', textDecorationLine: 'line-through' } : styles.taskTitleDone)]}>
                       {task.title}
                     </Text>
 
                     {task.description ? (
-                      <Text style={styles.taskDesc} numberOfLines={2}>
+                      <Text style={[styles.taskDesc, isDark && { color: '#A3AAA4' }]} numberOfLines={2}>
                         {task.description}
                       </Text>
                     ) : null}
 
                     <View style={styles.cardFooterRow}>
-                      <Text style={styles.viewQuestionsHint}>Tap to open questions & details ›</Text>
+                      <Text style={[styles.viewQuestionsHint, isDark && { color: '#9DE8BA' }]}>Tap to open questions & details ›</Text>
                     </View>
                   </TouchableOpacity>
                 );
               })
             ) : (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyText}>No tasks matching this filter.</Text>
+              <View style={[styles.emptyCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27' }]}>
+                <Text style={[styles.emptyTitle, isDark && { color: '#FFFFFF' }]}>No tasks matching this filter.</Text>
+                <Text style={[styles.emptyText, isDark && { color: '#A3AAA4' }]}>Try switching filters or clearing your search query.</Text>
               </View>
             )}
           </View>
@@ -654,12 +747,12 @@ function MainScreen() {
           <View style={styles.section}>
             {/* Header Title & Subtitle */}
             <View style={{ marginBottom: 4 }}>
-              <Text style={styles.subtextSmall}>BENCHMARK READINESS PLAN</Text>
-              <Text style={styles.screenMainHeading}>Your progress plan</Text>
+              <Text style={[styles.subtextSmall, isDark && { color: '#767C77' }]}>BENCHMARK READINESS PLAN</Text>
+              <Text style={[styles.screenMainHeading, isDark && { color: '#FFFFFF' }]}>Your progress plan</Text>
             </View>
 
             {/* Dark Hero Focal Card (Inspired by Screen 1 Box Breathing card) */}
-            <View style={styles.overviewCard}>
+            <View style={[styles.overviewCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27' }]}>
               <View style={styles.cardRow}>
                 <Text style={styles.cardHeaderSmall}>ACTIVE FOCUS WORKOUT</Text>
                 <View style={styles.stageChip}>
@@ -738,37 +831,37 @@ function MainScreen() {
             </View>
 
             {/* Circular Readiness Gauge Card (Inspired by Screen 3) */}
-            <View style={styles.circularResultCard}>
-              <Text style={styles.subtextSmall}>CHECK-IN COMPLETE</Text>
-              <Text style={styles.resultTitle}>Your readiness result</Text>
+            <View style={[styles.circularResultCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27' }]}>
+              <Text style={[styles.subtextSmall, isDark && { color: '#767C77' }]}>CHECK-IN COMPLETE</Text>
+              <Text style={[styles.resultTitle, isDark && { color: '#FFFFFF' }]}>Your readiness result</Text>
 
               {/* Circular Gauge Representation */}
               <View style={styles.circleGaugeContainer}>
-                <View style={styles.circleGaugeOuter}>
+                <View style={[styles.circleGaugeOuter, isDark && { borderColor: '#262A27' }]}>
                   <View style={styles.circleGaugeInner}>
-                    <Text style={styles.gaugeNumberText}>{data?.overall_preparation_percent ?? 0}</Text>
-                    <Text style={styles.gaugeSubText}>OF 100</Text>
+                    <Text style={[styles.gaugeNumberText, isDark && { color: '#FFFFFF' }]}>{data?.overall_preparation_percent ?? 0}</Text>
+                    <Text style={[styles.gaugeSubText, isDark && { color: '#767C77' }]}>OF 100</Text>
                   </View>
                 </View>
               </View>
 
-              <Text style={styles.gaugeStatusLabel}>
+              <Text style={[styles.gaugeStatusLabel, isDark && { color: '#FFFFFF' }]}>
                 {data && data.overall_preparation_percent >= 80 ? 'Elevated Readiness' : 'Progressing Steady'}
               </Text>
-              <Text style={styles.gaugeStatusDesc}>
+              <Text style={[styles.gaugeStatusDesc, isDark && { color: '#A3AAA4' }]}>
                 Your benchmark progress needs steady practice, not cramming.
               </Text>
 
               {/* What Drives It Progress Rows */}
-              <View style={styles.whatDrivesItBox}>
-                <Text style={styles.whatDrivesItTitle}>What drives it</Text>
+              <View style={[styles.whatDrivesItBox, isDark && { backgroundColor: '#202422' }]}>
+                <Text style={[styles.whatDrivesItTitle, isDark && { color: '#FFFFFF' }]}>What drives it</Text>
 
                 <View style={styles.driverRow}>
                   <View style={styles.driverLabelRow}>
-                    <Text style={styles.driverName}>BM1 Foundations</Text>
-                    <Text style={styles.driverValue}>{bm1?.completion_percent || 0}%</Text>
+                    <Text style={[styles.driverName, isDark && { color: '#A3AAA4' }]}>BM1 Foundations</Text>
+                    <Text style={[styles.driverValue, isDark && { color: '#FFFFFF' }]}>{bm1?.completion_percent || 0}%</Text>
                   </View>
-                  <View style={styles.driverBarTrack}>
+                  <View style={[styles.driverBarTrack, isDark && { backgroundColor: '#2E3330' }]}>
                     <View
                       style={[
                         styles.driverBarFill,
@@ -780,10 +873,10 @@ function MainScreen() {
 
                 <View style={styles.driverRow}>
                   <View style={styles.driverLabelRow}>
-                    <Text style={styles.driverName}>BM2 Systems</Text>
-                    <Text style={styles.driverValue}>{bm2?.completion_percent || 0}%</Text>
+                    <Text style={[styles.driverName, isDark && { color: '#A3AAA4' }]}>BM2 Systems</Text>
+                    <Text style={[styles.driverValue, isDark && { color: '#FFFFFF' }]}>{bm2?.completion_percent || 0}%</Text>
                   </View>
-                  <View style={styles.driverBarTrack}>
+                  <View style={[styles.driverBarTrack, isDark && { backgroundColor: '#2E3330' }]}>
                     <View
                       style={[
                         styles.driverBarFill,
@@ -795,10 +888,10 @@ function MainScreen() {
 
                 <View style={styles.driverRow}>
                   <View style={styles.driverLabelRow}>
-                    <Text style={styles.driverName}>TOI Evaluation</Text>
-                    <Text style={styles.driverValue}>{toi?.status === 'LOCKED' ? '0%' : '100%'}</Text>
+                    <Text style={[styles.driverName, isDark && { color: '#A3AAA4' }]}>TOI Evaluation</Text>
+                    <Text style={[styles.driverValue, isDark && { color: '#FFFFFF' }]}>{toi?.status === 'LOCKED' ? '0%' : '100%'}</Text>
                   </View>
-                  <View style={styles.driverBarTrack}>
+                  <View style={[styles.driverBarTrack, isDark && { backgroundColor: '#2E3330' }]}>
                     <View
                       style={[
                         styles.driverBarFill,
@@ -811,9 +904,9 @@ function MainScreen() {
             </View>
 
             {/* Immediate Focus (Numbered List Inspired by Screen 1 Next 30 Minutes) */}
-            <View style={styles.focusListBox}>
-              <Text style={styles.subtextSmall}>NEXT FOCUS ACTIONS</Text>
-              <Text style={styles.resultTitle}>Today's Priority Topics</Text>
+            <View style={[styles.focusListBox, isDark && { backgroundColor: '#161917', borderColor: '#262A27' }]}>
+              <Text style={[styles.subtextSmall, isDark && { color: '#767C77' }]}>NEXT FOCUS ACTIONS</Text>
+              <Text style={[styles.resultTitle, isDark && { color: '#FFFFFF' }]}>Today's Priority Topics</Text>
 
               {data?.focus_areas && data.focus_areas.length > 0 ? (
                 data.focus_areas.map((fa, idx) => (
@@ -823,20 +916,20 @@ function MainScreen() {
                       const area = data?.learning_areas_progress.find((a) => a.id === fa.area_id);
                       if (area) handleOpenArea(area);
                     }}
-                    style={styles.focusNumberedRow}
+                    style={[styles.focusNumberedRow, isDark && { borderBottomColor: '#262A27' }]}
                   >
-                    <View style={styles.numberCircle}>
-                      <Text style={styles.numberCircleText}>{idx + 1}</Text>
+                    <View style={[styles.numberCircle, isDark && { backgroundColor: '#202422' }]}>
+                      <Text style={[styles.numberCircleText, isDark && { color: '#FFFFFF' }]}>{idx + 1}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.focusItemTitle}>{fa.area_title}</Text>
-                      <Text style={styles.focusItemSub}>{fa.pending_topics_count} topics · {fa.module_code}</Text>
+                      <Text style={[styles.focusItemTitle, isDark && { color: '#FFFFFF' }]}>{fa.area_title}</Text>
+                      <Text style={[styles.focusItemSub, isDark && { color: '#A3AAA4' }]}>{fa.pending_topics_count} topics · {fa.module_code}</Text>
                     </View>
-                    <Text style={styles.focusItemPercent}>{fa.completion_percent}% ›</Text>
+                    <Text style={[styles.focusItemPercent, isDark && { color: '#9DE8BA' }]}>{fa.completion_percent}% ›</Text>
                   </TouchableOpacity>
                 ))
               ) : (
-                <Text style={styles.emptyText}>All active learning areas currently completed!</Text>
+                <Text style={[styles.emptyText, isDark && { color: '#A3AAA4' }]}>All active learning areas currently completed!</Text>
               )}
 
               {/* Mint Pill Button (Inspired by Screen 1 Start Reset Button) */}
@@ -866,38 +959,38 @@ function MainScreen() {
               onPress={() => setActiveTab('Home')}
               style={styles.backButtonContainer}
             >
-              <Text style={styles.backButtonText}>← Back to Dashboard</Text>
+              <Text style={[styles.backButtonText, isDark && { color: '#FFFFFF' }]}>← Back to Dashboard</Text>
             </TouchableOpacity>
 
-            <Text style={styles.sectionTitle}>LEARNING AREAS (TAP TO VIEW TOPICS)</Text>
+            <Text style={[styles.sectionTitle, isDark && { color: '#888F89' }]}>LEARNING AREAS (TAP TO VIEW TOPICS)</Text>
             {data?.learning_areas_progress.map((area) => (
               <TouchableOpacity
                 key={area.id}
                 activeOpacity={0.7}
                 onPress={() => handleOpenArea(area)}
-                style={styles.areaCard}
+                style={[styles.areaCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27' }]}
               >
                 <View style={styles.cardRow}>
-                  <Text style={styles.areaTitle}>{area.title}</Text>
-                  <Text style={styles.areaBadge}>{area.module_code}</Text>
+                  <Text style={[styles.areaTitle, isDark && { color: '#FFFFFF' }]}>{area.title}</Text>
+                  <Text style={[styles.areaBadge, isDark && { backgroundColor: '#202422', color: '#9DE8BA' }]}>{area.module_code}</Text>
                 </View>
-                <Text style={styles.areaDesc}>{area.description}</Text>
+                <Text style={[styles.areaDesc, isDark && { color: '#A3AAA4' }]}>{area.description}</Text>
                 <View style={styles.cardRow}>
-                  <Text style={styles.statLabel}>{area.completed_topics}/{area.total_topics} topics</Text>
-                  <Text style={styles.statValue}>{area.completion_percent}%</Text>
+                  <Text style={[styles.statLabel, isDark && { color: '#767C77' }]}>{area.completed_topics}/{area.total_topics} topics</Text>
+                  <Text style={[styles.statValue, isDark && { color: '#FFFFFF' }]}>{area.completion_percent}%</Text>
                 </View>
-                <Text style={styles.cardActionHint}>Tap to view topics ›</Text>
+                <Text style={[styles.cardActionHint, isDark && { color: '#9DE8BA' }]}>Tap to view topics ›</Text>
               </TouchableOpacity>
             ))}
           </View>
         ) : activeTab === 'TOI' ? (
           /* 7. TOI STAGE */
           <View style={styles.centerContainer}>
-            <View style={styles.lockedTagBox}>
-              <Text style={styles.lockedTagBoxText}>STAGE 03 • LOCKED</Text>
+            <View style={[styles.lockedTagBox, isDark && { backgroundColor: '#202422' }]}>
+              <Text style={[styles.lockedTagBoxText, isDark && { color: '#A3AAA4' }]}>STAGE 03 • LOCKED</Text>
             </View>
-            <Text style={styles.errorTitle}>TOI Stage Locked</Text>
-            <Text style={styles.errorDesc}>
+            <Text style={[styles.errorTitle, isDark && { color: '#FFFFFF' }]}>TOI Stage Locked</Text>
+            <Text style={[styles.errorDesc, isDark && { color: '#A3AAA4' }]}>
               Complete all BM1 and BM2 curriculum requirements to unlock live mock machine tasks.
             </Text>
           </View>
@@ -909,22 +1002,22 @@ function MainScreen() {
                 onPress={() => setActiveTab('Home')}
                 style={styles.backButtonContainer}
               >
-                <Text style={styles.backButtonText}>← Dashboard</Text>
+                <Text style={[styles.backButtonText, isDark && { color: '#FFFFFF' }]}>← Dashboard</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => loadAnalytics(pacingDays)}
                 disabled={analyticsLoading}
-                style={styles.recalcBtn}
+                style={[styles.recalcBtn, isDark && { backgroundColor: '#202422', borderWidth: 1, borderColor: '#2E3330' }]}
               >
-                <Text style={styles.recalcBtnText}>
+                <Text style={[styles.recalcBtnText, isDark && { color: '#9DE8BA' }]}>
                   {analyticsLoading ? 'Computing...' : 'Recalculate'}
                 </Text>
               </TouchableOpacity>
             </View>
 
             {/* Overview / Readiness Banner */}
-            <View style={styles.overviewCard}>
+            <View style={[styles.overviewCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27' }]}>
               <Text style={styles.cardHeaderSmall}>PREPARATION PROGRESS & VELOCITY</Text>
               <Text style={styles.hugePercent}>{data?.overall_preparation_percent}%</Text>
               <Text style={styles.formulaText}>Overall Readiness: BM1 (40%) + BM2 (40%) + TOI (20%)</Text>
@@ -932,43 +1025,43 @@ function MainScreen() {
 
             {/* 4 Telemetry Metric Cards */}
             <View style={styles.telemetryGrid}>
-              <View style={styles.telemetryCard}>
-                <Text style={styles.telemetryLabel}>DAILY OUTPUT</Text>
-                <Text style={styles.telemetryValue}>{analyticsData?.daily_completed_count ?? 0}</Text>
-                <Text style={styles.telemetrySubtext}>
+              <View style={[styles.telemetryCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27', borderWidth: 1 }]}>
+                <Text style={[styles.telemetryLabel, isDark && { color: '#888F89' }]}>DAILY OUTPUT</Text>
+                <Text style={[styles.telemetryValue, isDark && { color: '#FFFFFF' }]}>{analyticsData?.daily_completed_count ?? 0}</Text>
+                <Text style={[styles.telemetrySubtext, isDark && { color: '#A3AAA4' }]}>
                   Target: {analyticsData?.required_daily_pace ?? 1.0} / day
                 </Text>
               </View>
 
-              <View style={styles.telemetryCard}>
-                <Text style={styles.telemetryLabel}>WEEKLY OUTPUT</Text>
-                <Text style={styles.telemetryValue}>{analyticsData?.weekly_completed_count ?? 0}</Text>
-                <Text style={styles.telemetrySubtext}>
+              <View style={[styles.telemetryCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27', borderWidth: 1 }]}>
+                <Text style={[styles.telemetryLabel, isDark && { color: '#888F89' }]}>WEEKLY OUTPUT</Text>
+                <Text style={[styles.telemetryValue, isDark && { color: '#FFFFFF' }]}>{analyticsData?.weekly_completed_count ?? 0}</Text>
+                <Text style={[styles.telemetrySubtext, isDark && { color: '#A3AAA4' }]}>
                   {analyticsData?.study_velocity_topics_per_day ?? 0.8} items / day
                 </Text>
               </View>
 
-              <View style={styles.telemetryCard}>
-                <Text style={styles.telemetryLabel}>CONSISTENCY</Text>
-                <Text style={styles.telemetryValue}>{analyticsData?.current_streak_days ?? 2}d</Text>
-                <Text style={styles.telemetrySubtext}>Active Streak</Text>
+              <View style={[styles.telemetryCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27', borderWidth: 1 }]}>
+                <Text style={[styles.telemetryLabel, isDark && { color: '#888F89' }]}>CONSISTENCY</Text>
+                <Text style={[styles.telemetryValue, isDark && { color: '#FFFFFF' }]}>{analyticsData?.current_streak_days ?? 2}d</Text>
+                <Text style={[styles.telemetrySubtext, isDark && { color: '#A3AAA4' }]}>Active Streak</Text>
               </View>
 
-              <View style={styles.telemetryCard}>
-                <Text style={styles.telemetryLabel}>BM1 PASS</Text>
-                <Text style={[styles.telemetryValue, analyticsData?.bm1_readiness?.is_ready_to_unlock_bm2 ? styles.textEmerald : null]}>
+              <View style={[styles.telemetryCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27', borderWidth: 1 }]}>
+                <Text style={[styles.telemetryLabel, isDark && { color: '#888F89' }]}>BM1 PASS</Text>
+                <Text style={[styles.telemetryValue, isDark && { color: '#FFFFFF' }, analyticsData?.bm1_readiness?.is_ready_to_unlock_bm2 ? styles.textEmerald : null]}>
                   {analyticsData?.bm1_readiness?.is_ready_to_unlock_bm2
                     ? 'READY'
                     : `${analyticsData?.projected_days_to_bm1_pass ?? 0}d`}
                 </Text>
-                <Text style={styles.telemetrySubtext}>
+                <Text style={[styles.telemetrySubtext, isDark && { color: '#A3AAA4' }]}>
                   {analyticsData?.bm1_readiness?.is_ready_to_unlock_bm2 ? 'Requirements Met' : 'Projected remaining'}
                 </Text>
               </View>
             </View>
 
             {/* Pacing Target Selector */}
-            <View style={styles.overviewCard}>
+            <View style={[styles.overviewCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27' }]}>
               <View style={styles.cardRow}>
                 <Text style={styles.cardHeaderSmall}>CURRICULUM PACING TARGET</Text>
                 <Text style={styles.badgeSmall}>{pacingDays} DAYS</Text>
@@ -978,7 +1071,7 @@ function MainScreen() {
               </Text>
 
               {/* Segmented Buttons */}
-              <View style={styles.pacingToggleRow}>
+              <View style={[styles.pacingToggleRow, isDark && { backgroundColor: '#202422' }]}>
                 {[
                   { days: 7, label: '1 Week (7d)' },
                   { days: 14, label: '2 Weeks (14d)' },
@@ -992,13 +1085,14 @@ function MainScreen() {
                     }}
                     style={[
                       styles.pacingToggleBtn,
-                      pacingDays === item.days && styles.pacingToggleBtnActive,
+                      pacingDays === item.days && (isDark ? { backgroundColor: '#2E3330' } : styles.pacingToggleBtnActive),
                     ]}
                   >
                     <Text
                       style={[
                         styles.pacingToggleText,
-                        pacingDays === item.days && styles.pacingToggleTextActive,
+                        isDark && { color: '#A3AAA4' },
+                        pacingDays === item.days && (isDark ? { color: '#FFFFFF', fontWeight: 'bold' } : styles.pacingToggleTextActive),
                       ]}
                     >
                       {item.label}
@@ -1007,21 +1101,21 @@ function MainScreen() {
                 ))}
               </View>
 
-              <View style={styles.pacingDetailsBox}>
+              <View style={[styles.pacingDetailsBox, isDark && { backgroundColor: '#202422' }]}>
                 <View style={styles.cardRow}>
-                  <Text style={styles.pacingDetailLabel}>Required Daily Cadence:</Text>
-                  <Text style={styles.pacingDetailValue}>{analyticsData?.required_daily_pace ?? 1.0} items / day</Text>
+                  <Text style={[styles.pacingDetailLabel, isDark && { color: '#A3AAA4' }]}>Required Daily Cadence:</Text>
+                  <Text style={[styles.pacingDetailValue, isDark && { color: '#FFFFFF' }]}>{analyticsData?.required_daily_pace ?? 1.0} items / day</Text>
                 </View>
                 <View style={styles.cardRow}>
-                  <Text style={styles.pacingDetailLabel}>Items Pending in BM1:</Text>
-                  <Text style={styles.pacingDetailValue}>{analyticsData?.total_remaining_bm1_items ?? 0} items</Text>
+                  <Text style={[styles.pacingDetailLabel, isDark && { color: '#A3AAA4' }]}>Items Pending in BM1:</Text>
+                  <Text style={[styles.pacingDetailValue, isDark && { color: '#FFFFFF' }]}>{analyticsData?.total_remaining_bm1_items ?? 0} items</Text>
                 </View>
               </View>
             </View>
 
             {/* Struggling Areas & Weak Spot Recommendations */}
-            <Text style={styles.sectionTitle}>STRUGGLING AREAS & WEAK SPOTS</Text>
-            <Text style={styles.subtextSmall}>
+            <Text style={[styles.sectionTitle, isDark && { color: '#888F89' }]}>STRUGGLING AREAS & WEAK SPOTS</Text>
+            <Text style={[styles.subtextSmall, isDark && { color: '#767C77' }]}>
               Targeted recommendations actively computed until BM1 requirements are fully passed.
             </Text>
 
@@ -1034,7 +1128,13 @@ function MainScreen() {
                     key={area.area_id}
                     style={[
                       styles.strugglingCard,
-                      isHigh ? styles.strugglingCardHigh : isMod ? styles.strugglingCardMod : styles.strugglingCardTrack,
+                      isDark
+                        ? { backgroundColor: '#161917', borderColor: isHigh ? '#5A2229' : '#262A27' }
+                        : isHigh
+                        ? styles.strugglingCardHigh
+                        : isMod
+                        ? styles.strugglingCardMod
+                        : styles.strugglingCardTrack,
                     ]}
                   >
                     <View style={styles.cardRow}>
@@ -1046,17 +1146,17 @@ function MainScreen() {
                       >
                         {isHigh ? 'HIGH ATTENTION' : isMod ? 'MODERATE' : 'ON TRACK'}
                       </Text>
-                      <Text style={styles.statLabel}>{area.module_code}</Text>
+                      <Text style={[styles.statLabel, isDark && { color: '#767C77' }]}>{area.module_code}</Text>
                     </View>
 
-                    <Text style={styles.strugglingTitle}>{area.area_title}</Text>
-                    <Text style={styles.strugglingRec}>{area.recommendation}</Text>
+                    <Text style={[styles.strugglingTitle, isDark && { color: '#FFFFFF' }]}>{area.area_title}</Text>
+                    <Text style={[styles.strugglingRec, isDark && { color: '#A3AAA4' }]}>{area.recommendation}</Text>
 
                     <View style={styles.cardRow}>
-                      <Text style={styles.statLabel}>
+                      <Text style={[styles.statLabel, isDark && { color: '#767C77' }]}>
                         {area.pending_topics_count} topics • {area.pending_tasks_count} tasks pending
                       </Text>
-                      <Text style={styles.statValue}>{area.completion_percent}%</Text>
+                      <Text style={[styles.statValue, isDark && { color: '#FFFFFF' }]}>{area.completion_percent}%</Text>
                     </View>
 
                     <TouchableOpacity
@@ -1068,25 +1168,25 @@ function MainScreen() {
                           setActiveTab('Learn');
                         }
                       }}
-                      style={styles.focusAreaBtn}
+                      style={[styles.focusAreaBtn, isDark && { backgroundColor: '#9DE8BA' }]}
                     >
-                      <Text style={styles.focusAreaBtnText}>Open Learning Topics ›</Text>
+                      <Text style={[styles.focusAreaBtnText, isDark && { color: '#0D381E' }]}>Open Learning Topics ›</Text>
                     </TouchableOpacity>
                   </View>
                 );
               })
             ) : (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyTitle}>Curriculum On Track</Text>
-                <Text style={styles.emptyText}>
+              <View style={[styles.emptyCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27' }]}>
+                <Text style={[styles.emptyTitle, isDark && { color: '#FFFFFF' }]}>Curriculum On Track</Text>
+                <Text style={[styles.emptyText, isDark && { color: '#A3AAA4' }]}>
                   All BM1 areas are currently meeting requirements. Proceed with practical questions and tasks.
                 </Text>
               </View>
             )}
 
             {/* BM1 Progression Gate Assessment */}
-            <Text style={styles.sectionTitle}>BM1 → BM2 PROGRESSION GATE ASSESSMENT</Text>
-            <View style={styles.overviewCard}>
+            <Text style={[styles.sectionTitle, isDark && { color: '#888F89' }]}>BM1 → BM2 PROGRESSION GATE ASSESSMENT</Text>
+            <View style={[styles.overviewCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27' }]}>
               <View style={styles.cardRow}>
                 <Text style={styles.cardHeaderSmall}>GATE VERDICT</Text>
                 <Text
@@ -1101,15 +1201,16 @@ function MainScreen() {
 
               <View style={styles.progressRowContainer}>
                 <View style={styles.cardRow}>
-                  <Text style={styles.statLabel}>Topics Requirement</Text>
-                  <Text style={styles.statValue}>
+                  <Text style={[styles.statLabel, isDark && { color: '#767C77' }]}>Topics Requirement</Text>
+                  <Text style={[styles.statValue, isDark && { color: '#FFFFFF' }]}>
                     {analyticsData?.bm1_readiness?.completed_topics ?? 0} / {analyticsData?.bm1_readiness?.total_topics ?? 0}
                   </Text>
                 </View>
-                <View style={styles.progressBarTrack}>
+                <View style={[styles.progressBarTrack, isDark && { backgroundColor: '#262A27' }]}>
                   <View
                     style={[
                       styles.progressBarFill,
+                      isDark && { backgroundColor: '#9DE8BA' },
                       {
                         width: `${
                           analyticsData?.bm1_readiness?.total_topics
@@ -1128,12 +1229,12 @@ function MainScreen() {
 
               <View style={styles.progressRowContainer}>
                 <View style={styles.cardRow}>
-                  <Text style={styles.statLabel}>Required Tasks Requirement</Text>
-                  <Text style={styles.statValue}>
+                  <Text style={[styles.statLabel, isDark && { color: '#767C77' }]}>Required Tasks Requirement</Text>
+                  <Text style={[styles.statValue, isDark && { color: '#FFFFFF' }]}>
                     {analyticsData?.bm1_readiness?.completed_tasks ?? 0} / {analyticsData?.bm1_readiness?.total_tasks ?? 0}
                   </Text>
                 </View>
-                <View style={styles.progressBarTrack}>
+                <View style={[styles.progressBarTrack, isDark && { backgroundColor: '#262A27' }]}>
                   <View
                     style={[
                       styles.progressBarFill,
@@ -1155,10 +1256,10 @@ function MainScreen() {
               </View>
 
               {analyticsData?.bm1_readiness?.blocking_items && analyticsData.bm1_readiness.blocking_items.length > 0 ? (
-                <View style={styles.blockingBox}>
-                  <Text style={styles.blockingHeader}>BLOCKING ITEMS BEFORE BM2 PASS:</Text>
+                <View style={[styles.blockingBox, isDark && { backgroundColor: '#251C1A' }]}>
+                  <Text style={[styles.blockingHeader, isDark && { color: '#FCA5A5' }]}>BLOCKING ITEMS BEFORE BM2 PASS:</Text>
                   {analyticsData.bm1_readiness.blocking_items.map((b, bIdx) => (
-                    <Text key={bIdx} style={styles.blockingItemText}>
+                    <Text key={bIdx} style={[styles.blockingItemText, isDark && { color: '#F87171' }]}>
                       • {b}
                     </Text>
                   ))}
@@ -1169,39 +1270,341 @@ function MainScreen() {
         )}
       </ScrollView>
 
-      {/* NEW UPDATED BOTTOM NAVIGATION BAR: Home | Learn | Tasks | TOI | Progress */}
+      {/* 2. CENTER HOME QUICK-LAUNCH POP-UP DOCK */}
+      {quickHubVisible && (
+        <View style={styles.quickHubOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setQuickHubVisible(false)}
+          />
+          <View
+            style={[
+              styles.quickHubCard,
+              {
+                bottom: 78 + (insets.bottom > 0 ? insets.bottom : 12),
+                backgroundColor: isDark ? 'rgba(22, 26, 24, 0.97)' : 'rgba(255, 255, 255, 0.97)',
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+              },
+            ]}
+          >
+            {/* Grab handle indicator */}
+            <View style={styles.quickHubHandleBar}>
+              <View style={[styles.quickHubHandlePill, { backgroundColor: isDark ? '#363C38' : '#D1D5DB' }]} />
+            </View>
+
+            <View style={[styles.quickHubHeader, { borderBottomColor: isDark ? '#262A27' : '#F0F1EC' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={[styles.quickHubHeaderDot, { backgroundColor: isDark ? '#9DE8BA' : '#161917' }]} />
+                <Text style={[styles.quickHubHeaderTitle, { color: isDark ? '#FFFFFF' : '#161917' }]}>
+                  LIFT NAVIGATION & QUICK HUB
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setQuickHubVisible(false)} style={{ padding: 4 }}>
+                <Text style={{ color: isDark ? '#767C77' : '#8E928C', fontSize: 13, fontWeight: 'bold' }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Section A: Direct Page Navigation */}
+            <Text style={[styles.quickHubSectionTag, { color: isDark ? '#888F89' : '#70746E' }]}>SELECT PAGE</Text>
+            <View style={styles.quickHubGrid}>
+              {/* Home */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setQuickHubVisible(false);
+                  setSelectedArea(null);
+                  setSelectedTopic(null);
+                  setFocusedTask(null);
+                  setActiveTab('Home');
+                }}
+                style={[
+                  styles.quickHubItem,
+                  {
+                    backgroundColor: activeTab === 'Home' && !selectedArea && !selectedTopic && !focusedTask
+                      ? (isDark ? '#2A362E' : '#E6F4EA')
+                      : (isDark ? '#202422' : '#F0F1EC'),
+                    borderColor: activeTab === 'Home' && !selectedArea && !selectedTopic && !focusedTask
+                      ? (isDark ? '#9DE8BA' : '#161917')
+                      : (isDark ? '#2E3330' : '#E2E3DC'),
+                  },
+                ]}
+              >
+                <Text style={styles.quickHubIcon}>⌂</Text>
+                <Text style={[styles.quickHubLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>Dashboard</Text>
+                <Text style={[styles.quickHubSub, { color: isDark ? '#A3AAA4' : '#70746E' }]}>Readiness plan</Text>
+              </TouchableOpacity>
+
+              {/* Learn */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setQuickHubVisible(false);
+                  setSelectedArea(null);
+                  setSelectedTopic(null);
+                  setFocusedTask(null);
+                  setActiveTab('Learn');
+                }}
+                style={[
+                  styles.quickHubItem,
+                  {
+                    backgroundColor: activeTab === 'Learn'
+                      ? (isDark ? '#2A362E' : '#E6F4EA')
+                      : (isDark ? '#202422' : '#F0F1EC'),
+                    borderColor: activeTab === 'Learn'
+                      ? (isDark ? '#9DE8BA' : '#161917')
+                      : (isDark ? '#2E3330' : '#E2E3DC'),
+                  },
+                ]}
+              >
+                <Text style={styles.quickHubIcon}>⊞</Text>
+                <Text style={[styles.quickHubLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>Learn</Text>
+                <Text style={[styles.quickHubSub, { color: isDark ? '#A3AAA4' : '#70746E' }]}>BM1 & BM2 topics</Text>
+              </TouchableOpacity>
+
+              {/* Tasks */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setQuickHubVisible(false);
+                  setSelectedArea(null);
+                  setSelectedTopic(null);
+                  setFocusedTask(null);
+                  setActiveTab('Tasks');
+                }}
+                style={[
+                  styles.quickHubItem,
+                  {
+                    backgroundColor: activeTab === 'Tasks'
+                      ? (isDark ? '#2A362E' : '#E6F4EA')
+                      : (isDark ? '#202422' : '#F0F1EC'),
+                    borderColor: activeTab === 'Tasks'
+                      ? (isDark ? '#9DE8BA' : '#161917')
+                      : (isDark ? '#2E3330' : '#E2E3DC'),
+                  },
+                ]}
+              >
+                <Text style={styles.quickHubIcon}>✓</Text>
+                <Text style={[styles.quickHubLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>Tasks</Text>
+                <Text style={[styles.quickHubSub, { color: isDark ? '#A3AAA4' : '#70746E' }]}>{allTasksList.length} workouts</Text>
+              </TouchableOpacity>
+
+              {/* TOI */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setQuickHubVisible(false);
+                  setSelectedArea(null);
+                  setSelectedTopic(null);
+                  setFocusedTask(null);
+                  setActiveTab('TOI');
+                }}
+                style={[
+                  styles.quickHubItem,
+                  {
+                    backgroundColor: activeTab === 'TOI'
+                      ? (isDark ? '#2A362E' : '#E6F4EA')
+                      : (isDark ? '#202422' : '#F0F1EC'),
+                    borderColor: activeTab === 'TOI'
+                      ? (isDark ? '#9DE8BA' : '#161917')
+                      : (isDark ? '#2E3330' : '#E2E3DC'),
+                  },
+                ]}
+              >
+                <Text style={styles.quickHubIcon}>◈</Text>
+                <Text style={[styles.quickHubLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>TOI Mock</Text>
+                <Text style={[styles.quickHubSub, { color: isDark ? '#A3AAA4' : '#70746E' }]}>Interview sim</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Section B: Fast Shortcuts */}
+            <Text style={[styles.quickHubSectionTag, { color: isDark ? '#888F89' : '#70746E', marginTop: 4 }]}>QUICK ACTIONS</Text>
+            <View style={styles.quickHubShortcutRow}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setQuickHubVisible(false);
+                  if (data?.focus_areas && data.focus_areas.length > 0) {
+                    const area = data?.learning_areas_progress.find(
+                      (a) => a.id === data.focus_areas[0].area_id
+                    );
+                    if (area) handleOpenArea(area);
+                  } else {
+                    setActiveTab('Learn');
+                  }
+                }}
+                style={[styles.quickHubShortcutBtn, { backgroundColor: isDark ? '#202422' : '#F0F1EC', borderColor: isDark ? '#2E3330' : '#E2E3DC' }]}
+              >
+                <Text style={styles.quickHubShortcutIcon}>⚡</Text>
+                <Text style={[styles.quickHubShortcutLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>Priority Drill</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setQuickHubVisible(false);
+                  setSelectedArea(null);
+                  setSelectedTopic(null);
+                  setFocusedTask(null);
+                  setActiveTab('Progress');
+                }}
+                style={[styles.quickHubShortcutBtn, { backgroundColor: isDark ? '#202422' : '#F0F1EC', borderColor: isDark ? '#2E3330' : '#E2E3DC' }]}
+              >
+                <Text style={styles.quickHubShortcutIcon}>↗</Text>
+                <Text style={[styles.quickHubShortcutLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>Telemetry</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setQuickHubVisible(false);
+                  setProfileModalVisible(true);
+                }}
+                style={[styles.quickHubShortcutBtn, { backgroundColor: isDark ? '#202422' : '#F0F1EC', borderColor: isDark ? '#2E3330' : '#E2E3DC' }]}
+              >
+                <Text style={styles.quickHubShortcutIcon}>⚙️</Text>
+                <Text style={[styles.quickHubShortcutLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>BYOK AI</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setQuickHubVisible(false);
+                  handleQuickSwitchUser(currentUser?.username === 'user1' ? 'user2' : 'user1');
+                }}
+                style={[styles.quickHubShortcutBtn, { backgroundColor: isDark ? '#202422' : '#F0F1EC', borderColor: isDark ? '#2E3330' : '#E2E3DC' }]}
+              >
+                <Text style={styles.quickHubShortcutIcon}>👤</Text>
+                <Text style={[styles.quickHubShortcutLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>Partner</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* 3. MINIMAL FLOATING BOTTOM MENU BAR (5 SLOTS WITH CENTER HOME HUB) */}
       <View
         style={[
-          styles.bottomNav,
+          styles.bottomNavIsland,
           {
-            height: bottomBarHeight,
-            paddingBottom: bottomBarPadding,
+            bottom: insets.bottom > 0 ? insets.bottom : 12,
+            backgroundColor: isDark ? 'rgba(20, 24, 22, 0.94)' : 'rgba(255, 255, 255, 0.94)',
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
           },
         ]}
       >
-        {(['Home', 'Learn', 'Tasks', 'TOI', 'Progress'] as const).map((tab) => {
-          const isActive = activeTab === tab && !selectedArea && !selectedTopic && !focusedTask;
-          return (
-            <TouchableOpacity
-              key={tab}
-              activeOpacity={0.7}
-              onPress={() => {
-                setSelectedArea(null);
-                setSelectedTopic(null);
-                setFocusedTask(null);
-                setActiveTab(tab);
-              }}
-              style={styles.navItem}
+        {/* Slot 1: Learn */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => {
+            setSelectedArea(null);
+            setSelectedTopic(null);
+            setFocusedTask(null);
+            setActiveTab('Learn');
+          }}
+          style={styles.navSlot}
+        >
+          <View style={[styles.navSlotPill, activeTab === 'Learn' && !selectedArea && !selectedTopic && !focusedTask && (isDark ? styles.navSlotActiveDark : styles.navSlotActiveLight)]}>
+            <Text style={[styles.navIconText, activeTab === 'Learn' && (isDark ? styles.navIconActiveDark : styles.navIconActiveLight)]}>⊞</Text>
+            <Text style={[styles.navLabel, activeTab === 'Learn' ? (isDark ? styles.navLabelActiveDark : styles.navLabelActiveLight) : (isDark ? styles.navLabelInactiveDark : styles.navLabelInactiveLight)]}>
+              Learn
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Slot 2: Tasks */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => {
+            setSelectedArea(null);
+            setSelectedTopic(null);
+            setFocusedTask(null);
+            setActiveTab('Tasks');
+          }}
+          style={styles.navSlot}
+        >
+          <View style={[styles.navSlotPill, activeTab === 'Tasks' && !focusedTask && (isDark ? styles.navSlotActiveDark : styles.navSlotActiveLight)]}>
+            <Text style={[styles.navIconText, activeTab === 'Tasks' && (isDark ? styles.navIconActiveDark : styles.navIconActiveLight)]}>✓</Text>
+            <Text style={[styles.navLabel, activeTab === 'Tasks' ? (isDark ? styles.navLabelActiveDark : styles.navLabelActiveLight) : (isDark ? styles.navLabelInactiveDark : styles.navLabelInactiveLight)]}>
+              Tasks
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Slot 3: CENTER HOME BUTTON (Hero Island Hub) */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => {
+            if (activeTab === 'Home' && !selectedArea && !selectedTopic && !focusedTask) {
+              setQuickHubVisible(!quickHubVisible);
+            } else {
+              setSelectedArea(null);
+              setSelectedTopic(null);
+              setFocusedTask(null);
+              setActiveTab('Home');
+            }
+          }}
+          onLongPress={() => setQuickHubVisible(true)}
+          style={styles.navCenterHubSlot}
+        >
+          <View
+            style={[
+              styles.navCenterHubBtn,
+              activeTab === 'Home' && !selectedArea && !selectedTopic && !focusedTask
+                ? (isDark ? styles.navCenterHubActiveDark : styles.navCenterHubActiveLight)
+                : (isDark ? styles.navCenterHubInactiveDark : styles.navCenterHubInactiveLight),
+            ]}
+          >
+            <Text
+              style={[
+                styles.navCenterHubIcon,
+                activeTab === 'Home' && !selectedArea && !selectedTopic && !focusedTask
+                  ? (isDark ? styles.navCenterHubIconActiveDark : styles.navCenterHubIconActiveLight)
+                  : (isDark ? styles.navCenterHubIconInactiveDark : styles.navCenterHubIconInactiveLight),
+              ]}
             >
-              <Text style={[styles.navIconText, isActive && styles.navIconActive]}>
-                {tab === 'Home' ? '⌂' : tab === 'Learn' ? '⊞' : tab === 'Tasks' ? '✓' : tab === 'TOI' ? '◈' : '↗'}
-              </Text>
-              <Text style={[styles.navText, isActive ? styles.navTextActive : styles.navTextInactive]}>
-                {tab}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+              ⌂
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Slot 4: TOI */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => {
+            setSelectedArea(null);
+            setSelectedTopic(null);
+            setFocusedTask(null);
+            setActiveTab('TOI');
+          }}
+          style={styles.navSlot}
+        >
+          <View style={[styles.navSlotPill, activeTab === 'TOI' && (isDark ? styles.navSlotActiveDark : styles.navSlotActiveLight)]}>
+            <Text style={[styles.navIconText, activeTab === 'TOI' && (isDark ? styles.navIconActiveDark : styles.navIconActiveLight)]}>◈</Text>
+            <Text style={[styles.navLabel, activeTab === 'TOI' ? (isDark ? styles.navLabelActiveDark : styles.navLabelActiveLight) : (isDark ? styles.navLabelInactiveDark : styles.navLabelInactiveLight)]}>
+              TOI
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Slot 5: Progress */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => {
+            setSelectedArea(null);
+            setSelectedTopic(null);
+            setFocusedTask(null);
+            setActiveTab('Progress');
+          }}
+          style={styles.navSlot}
+        >
+          <View style={[styles.navSlotPill, activeTab === 'Progress' && (isDark ? styles.navSlotActiveDark : styles.navSlotActiveLight)]}>
+            <Text style={[styles.navIconText, activeTab === 'Progress' && (isDark ? styles.navIconActiveDark : styles.navIconActiveLight)]}>↗</Text>
+            <Text style={[styles.navLabel, activeTab === 'Progress' ? (isDark ? styles.navLabelActiveDark : styles.navLabelActiveLight) : (isDark ? styles.navLabelInactiveDark : styles.navLabelInactiveLight)]}>
+              Stats
+            </Text>
+          </View>
+        </TouchableOpacity>
       </View>
 
       {/* PROFILE & SETTINGS MODAL (Triggered by Circular Profile Avatar) */}
@@ -1212,80 +1615,82 @@ function MainScreen() {
         onRequestClose={() => setProfileModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={[styles.modalSheet, isDark && { backgroundColor: '#161917', borderColor: '#262A27', borderWidth: 1 }, { paddingBottom: insets.bottom + 16 }]}>
             {/* Modal Header */}
-            <View style={styles.modalHeaderRow}>
+            <View style={[styles.modalHeaderRow, isDark && { borderBottomColor: '#262A27' }]}>
               <View style={styles.modalUserHeader}>
-                <View style={styles.modalAvatarCircle}>
-                  <Text style={styles.modalAvatarText}>{userInitial}</Text>
+                <View style={[styles.modalAvatarCircle, isDark && { backgroundColor: '#202422', borderColor: '#2E3330', borderWidth: 1 }]}>
+                  <Text style={[styles.modalAvatarText, isDark && { color: '#9DE8BA' }]}>{userInitial}</Text>
                 </View>
                 <View>
-                  <Text style={styles.modalUserName}>{currentUser?.full_name || currentUser?.username || 'User'}</Text>
-                  <Text style={styles.modalUserEmail}>{currentUser?.email || 'Logged in'}</Text>
+                  <Text style={[styles.modalUserName, isDark && { color: '#FFFFFF' }]}>{currentUser?.full_name || currentUser?.username || 'User'}</Text>
+                  <Text style={[styles.modalUserEmail, isDark && { color: '#A3AAA4' }]}>{currentUser?.email || 'Logged in'}</Text>
                 </View>
               </View>
               <TouchableOpacity
                 onPress={() => setProfileModalVisible(false)}
                 style={styles.modalCloseBtn}
               >
-                <Text style={styles.modalCloseBtnText}>✕</Text>
+                <Text style={[styles.modalCloseBtnText, isDark && { color: '#A3AAA4' }]}>✕</Text>
               </TouchableOpacity>
             </View>
 
             <ScrollView style={{ maxHeight: 420 }}>
               {/* Quick Switch Demo Users */}
-              <Text style={styles.modalSectionLabel}>SWITCH ACTIVE USER</Text>
+              <Text style={[styles.modalSectionLabel, isDark && { color: '#888F89' }]}>SWITCH ACTIVE USER</Text>
               <View style={styles.quickSwitchRow}>
                 <TouchableOpacity
                   onPress={() => handleQuickSwitchUser('user1')}
                   style={[
                     styles.quickSwitchBtn,
-                    currentUser?.username === 'user1' && styles.quickSwitchBtnActive,
+                    isDark && { backgroundColor: '#202422', borderColor: '#2E3330' },
+                    currentUser?.username === 'user1' && (isDark ? { backgroundColor: '#9DE8BA', borderColor: '#9DE8BA' } : styles.quickSwitchBtnActive),
                   ]}
                 >
-                  <Text style={styles.quickSwitchText}>User 1 (Nivin)</Text>
+                  <Text style={[styles.quickSwitchText, isDark && { color: '#FFFFFF' }, currentUser?.username === 'user1' && isDark && { color: '#0D381E' }]}>User 1 (Nivin)</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={() => handleQuickSwitchUser('user2')}
                   style={[
                     styles.quickSwitchBtn,
-                    currentUser?.username === 'user2' && styles.quickSwitchBtnActive,
+                    isDark && { backgroundColor: '#202422', borderColor: '#2E3330' },
+                    currentUser?.username === 'user2' && (isDark ? { backgroundColor: '#9DE8BA', borderColor: '#9DE8BA' } : styles.quickSwitchBtnActive),
                   ]}
                 >
-                  <Text style={styles.quickSwitchText}>User 2 (Partner)</Text>
+                  <Text style={[styles.quickSwitchText, isDark && { color: '#FFFFFF' }, currentUser?.username === 'user2' && isDark && { color: '#0D381E' }]}>User 2 (Partner)</Text>
                 </TouchableOpacity>
               </View>
 
               {/* Login / Register with Any Email & Password */}
-              <Text style={styles.modalSectionLabel}>
+              <Text style={[styles.modalSectionLabel, isDark && { color: '#888F89' }]}>
                 {isRegisterMode ? 'REGISTER WITH ANY EMAIL' : 'SIGN IN WITH ANY EMAIL'}
               </Text>
-              <View style={styles.authBox}>
+              <View style={[styles.authBox, isDark && { backgroundColor: '#1B1F1C' }]}>
                 <TextInput
                   placeholder="Enter email (e.g. nivin@gmail.com)"
-                  placeholderTextColor="#64748b"
+                  placeholderTextColor={isDark ? '#767C77' : '#64748b'}
                   value={customEmail}
                   onChangeText={setCustomEmail}
                   keyboardType="email-address"
                   autoCapitalize="none"
-                  style={styles.authInput}
+                  style={[styles.authInput, isDark && { backgroundColor: '#202422', borderColor: '#2E3330', color: '#FFFFFF' }]}
                 />
                 <TextInput
                   placeholder="Enter password"
-                  placeholderTextColor="#64748b"
+                  placeholderTextColor={isDark ? '#767C77' : '#64748b'}
                   value={customPassword}
                   onChangeText={setCustomPassword}
                   secureTextEntry
-                  style={styles.authInput}
+                  style={[styles.authInput, isDark && { backgroundColor: '#202422', borderColor: '#2E3330', color: '#FFFFFF' }]}
                 />
 
                 <TouchableOpacity
                   onPress={handleCustomAuth}
                   disabled={authSubmitting}
-                  style={styles.authSubmitBtn}
+                  style={[styles.authSubmitBtn, isDark && { backgroundColor: '#9DE8BA' }]}
                 >
-                  <Text style={styles.authSubmitBtnText}>
+                  <Text style={[styles.authSubmitBtnText, isDark && { color: '#0D381E' }]}>
                     {authSubmitting ? 'Authenticating...' : isRegisterMode ? 'Create Account & Sign In' : 'Sign In with Email'}
                   </Text>
                 </TouchableOpacity>
@@ -1294,43 +1699,43 @@ function MainScreen() {
                   onPress={() => setIsRegisterMode(!isRegisterMode)}
                   style={{ marginTop: 8, alignItems: 'center' }}
                 >
-                  <Text style={styles.authToggleText}>
+                  <Text style={[styles.authToggleText, isDark && { color: '#9DE8BA' }]}>
                     {isRegisterMode ? 'Already have an account? Sign In' : 'Need a new account? Register'}
                   </Text>
                 </TouchableOpacity>
               </View>
 
               {/* Gemini BYOK Config */}
-              <Text style={styles.modalSectionLabel}>GEMINI BYOK CONFIGURATION</Text>
-              <View style={styles.authBox}>
+              <Text style={[styles.modalSectionLabel, isDark && { color: '#888F89' }]}>GEMINI BYOK CONFIGURATION</Text>
+              <View style={[styles.authBox, isDark && { backgroundColor: '#1B1F1C' }]}>
                 <TextInput
                   placeholder="Paste Gemini API Key..."
-                  placeholderTextColor="#64748b"
+                  placeholderTextColor={isDark ? '#767C77' : '#64748b'}
                   value={apiKeyInput}
                   onChangeText={setApiKeyInput}
                   secureTextEntry
-                  style={styles.authInput}
+                  style={[styles.authInput, isDark && { backgroundColor: '#202422', borderColor: '#2E3330', color: '#FFFFFF' }]}
                 />
                 <View style={styles.byokButtonRow}>
                   <TouchableOpacity
                     onPress={handleTestKey}
                     disabled={testingKey}
-                    style={styles.byokTestBtn}
+                    style={[styles.byokTestBtn, isDark && { backgroundColor: '#202422', borderColor: '#2E3330', borderWidth: 1 }]}
                   >
-                    <Text style={styles.byokTestBtnText}>
+                    <Text style={[styles.byokTestBtnText, isDark && { color: '#FFFFFF' }]}>
                       {testingKey ? 'Testing...' : 'Test Connection'}
                     </Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     onPress={handleSaveKey}
-                    style={styles.byokSaveBtn}
+                    style={[styles.byokSaveBtn, isDark && { backgroundColor: '#9DE8BA' }]}
                   >
-                    <Text style={styles.byokSaveBtnText}>Save Key</Text>
+                    <Text style={[styles.byokSaveBtnText, isDark && { color: '#0D381E' }]}>Save Key</Text>
                   </TouchableOpacity>
                 </View>
                 {testResult ? (
-                  <Text style={styles.testResultText}>{testResult}</Text>
+                  <Text style={[styles.testResultText, isDark && { color: '#9DE8BA' }]}>{testResult}</Text>
                 ) : null}
               </View>
             </ScrollView>
@@ -1390,36 +1795,113 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 12,
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+  // Floating Top Island Navigation
+  topIsland: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 6,
+    borderRadius: 24,
+    borderWidth: 1,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  topIslandRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E3DC',
-    backgroundColor: '#FFFFFF',
   },
-  brandTitle: {
-    color: '#161917',
-    fontWeight: 'bold',
-    fontSize: 17,
+  topBrandCluster: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  topBrandLogo: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  topBrandLogoText: {
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  topBrandName: {
+    fontSize: 16,
+    fontWeight: '800',
     letterSpacing: 0.5,
   },
-  brandSubtitle: {
-    color: '#8E928C',
+  topStageBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 5,
+  },
+  topStageDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  topStageText: {
     fontSize: 10,
     fontFamily: 'monospace',
-    marginTop: 1,
+    fontWeight: 'bold',
+  },
+  topActionCluster: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  topIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  topIconSymbol: {
+    fontSize: 14,
+  },
+  topSearchBox: {
+    borderTopWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  topSearchInput: {
+    flex: 1,
+    height: 36,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    fontSize: 12,
+    fontFamily: 'monospace',
+  },
+  topSearchClearBtn: {
+    position: 'absolute',
+    right: 22,
+    padding: 6,
   },
   profileCircleBtn: {
     position: 'relative',
   },
   profileCircleInner: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#161917',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -1430,15 +1912,15 @@ const styles = StyleSheet.create({
   profileInitialText: {
     color: '#FFFFFF',
     fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 13,
   },
   activeDot: {
     position: 'absolute',
     bottom: -1,
     right: -1,
-    width: 11,
-    height: 11,
-    borderRadius: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: '#9DE8BA',
     borderWidth: 2,
     borderColor: '#FFFFFF',
@@ -2240,49 +2722,231 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
-  // Floating Bottom Navigation (Matching Reference Screenshot)
-  bottomNav: {
+  // Floating Bottom Menu Bar Island
+  bottomNavIsland: {
     position: 'absolute',
-    bottom: 12,
     left: 16,
     right: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 36,
+    height: 64,
+    borderRadius: 32,
     borderWidth: 1,
-    borderColor: '#E2E3DC',
     flexDirection: 'row',
-    justifyContent: 'space-around',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 18,
+    elevation: 12,
   },
-  navItem: {
+  navSlot: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
-    paddingVertical: 6,
+  },
+  navSlotPill: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 18,
+    minWidth: 50,
+  },
+  navSlotActiveDark: {
+    backgroundColor: '#202422',
+  },
+  navSlotActiveLight: {
+    backgroundColor: '#F0F1EC',
   },
   navIconText: {
     fontSize: 16,
-    color: '#8E928C',
     marginBottom: 2,
-  },
-  navIconActive: {
-    color: '#161917',
-  },
-  navText: {
-    fontSize: 10,
     fontWeight: '600',
   },
-  navTextActive: {
+  navIconActiveDark: {
+    color: '#9DE8BA',
+  },
+  navIconActiveLight: {
+    color: '#161917',
+  },
+  navLabel: {
+    fontSize: 9.5,
+    fontFamily: 'monospace',
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  navLabelActiveDark: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  navLabelActiveLight: {
     color: '#161917',
     fontWeight: 'bold',
   },
-  navTextInactive: {
+  navLabelInactiveDark: {
+    color: '#767C77',
+  },
+  navLabelInactiveLight: {
     color: '#8E928C',
+  },
+
+  // Center Home Hub Button
+  navCenterHubSlot: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  navCenterHubBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  navCenterHubActiveDark: {
+    backgroundColor: '#9DE8BA',
+  },
+  navCenterHubActiveLight: {
+    backgroundColor: '#161917',
+  },
+  navCenterHubInactiveDark: {
+    backgroundColor: '#202422',
+    borderWidth: 1,
+    borderColor: '#2E3330',
+  },
+  navCenterHubInactiveLight: {
+    backgroundColor: '#F0F1EC',
+    borderWidth: 1,
+    borderColor: '#E2E3DC',
+  },
+  navCenterHubIcon: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginTop: -2,
+  },
+  navCenterHubIconActiveDark: {
+    color: '#0D381E',
+  },
+  navCenterHubIconActiveLight: {
+    color: '#FFFFFF',
+  },
+  navCenterHubIconInactiveDark: {
+    color: '#D1D5DB',
+  },
+  navCenterHubIconInactiveLight: {
+    color: '#161917',
+  },
+
+  // Quick Action Pop-up Dock
+  quickHubOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    zIndex: 99,
+  },
+  quickHubCard: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    borderRadius: 28,
+    borderWidth: 1,
+    padding: 18,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.28,
+    shadowRadius: 20,
+    elevation: 16,
+  },
+  quickHubHandleBar: {
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  quickHubHandlePill: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+  },
+  quickHubHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    paddingBottom: 10,
+  },
+  quickHubHeaderDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  quickHubHeaderTitle: {
+    fontSize: 11,
+    fontFamily: 'monospace',
+    fontWeight: 'bold',
+    letterSpacing: 0.8,
+  },
+  quickHubSectionTag: {
+    fontSize: 9.5,
+    fontFamily: 'monospace',
+    fontWeight: 'bold',
+    letterSpacing: 0.8,
+    marginBottom: -4,
+  },
+  quickHubGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  quickHubItem: {
+    width: '48%',
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 12,
+    gap: 2,
+  },
+  quickHubIcon: {
+    fontSize: 18,
+    marginBottom: 2,
+  },
+  quickHubLabel: {
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  quickHubSub: {
+    fontSize: 10,
+    fontFamily: 'monospace',
+  },
+  quickHubShortcutRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  quickHubShortcutBtn: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    gap: 4,
+  },
+  quickHubShortcutIcon: {
+    fontSize: 16,
+  },
+  quickHubShortcutLabel: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    fontFamily: 'monospace',
   },
 
   // Profile & Settings Modal
