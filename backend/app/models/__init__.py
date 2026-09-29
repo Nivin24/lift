@@ -1,0 +1,33 @@
+from app.models.entities import (
+    User,
+    Module,
+    LearningArea,
+    Topic,
+    Material,
+    Resource,
+    Question,
+    Task,
+    UserProgress,
+    UserTopicProgress,
+    UserTaskProgress,
+    AICredentials,
+    AIGenerationHistory,
+    ActivityLog,
+)
+
+__all__ = [
+    "User",
+    "Module",
+    "LearningArea",
+    "Topic",
+    "Material",
+    "Resource",
+    "Question",
+    "Task",
+    "UserProgress",
+    "UserTopicProgress",
+    "UserTaskProgress",
+    "AICredentials",
+    "AIGenerationHistory",
+    "ActivityLog",
+]
