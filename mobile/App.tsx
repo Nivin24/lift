@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -11,7 +11,23 @@ import {
   TextInput,
   Modal,
   Image,
+  PanResponder,
 } from 'react-native';
+import {
+  SearchIcon,
+  SunIcon,
+  MoonIcon,
+  HomeIcon,
+  LearnIcon,
+  TasksIcon,
+  ToiIcon,
+  StatsIcon,
+  ZapIcon,
+  SettingsIcon,
+  UserIcon,
+  CheckIcon,
+  CloseIcon,
+} from './src/components/VectorIcons';
 import { SafeAreaView, SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MobileApi, MobileTopicSummary, MobileTopicDetail, MobileUser } from './src/services/api';
 import { DashboardOverview, Task, LearningAreaProgress, AnalyticsOverview } from './src/types';
@@ -65,6 +81,59 @@ function MainScreen() {
   // In-Island Search state
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Drag to select bottom bar tabs
+  const navBarLayoutRef = useRef<{ pageX: number; width: number }>({ pageX: 16, width: 360 });
+  const navBarViewRef = useRef<View>(null);
+
+  const measureNavBar = () => {
+    navBarViewRef.current?.measure((_x, _y, width, _height, pageX, _pageY) => {
+      if (width > 0) {
+        navBarLayoutRef.current = { pageX, width };
+      }
+    });
+  };
+
+  const navTabsList: Array<'Learn' | 'Tasks' | 'Home' | 'TOI' | 'Progress'> = [
+    'Learn',
+    'Tasks',
+    'Home',
+    'TOI',
+    'Progress',
+  ];
+
+  const handleDragToTab = (screenX: number) => {
+    const { pageX, width } = navBarLayoutRef.current;
+    if (width <= 0) return;
+    const relX = screenX - pageX;
+    const clampedRelX = Math.max(0, Math.min(relX, width - 1));
+    const slotIndex = Math.min(4, Math.max(0, Math.floor((clampedRelX / width) * 5)));
+    const targetTab = navTabsList[slotIndex];
+    if (targetTab !== activeTab) {
+      setSelectedArea(null);
+      setSelectedTopic(null);
+      setFocusedTask(null);
+      setActiveTab(targetTab);
+    }
+  };
+
+  const bottomBarPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dx) > 6,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponderCapture: (_, gestureState) => Math.abs(gestureState.dx) > 6,
+      onPanResponderGrant: (evt) => {
+        handleDragToTab(evt.nativeEvent.pageX);
+      },
+      onPanResponderMove: (evt) => {
+        handleDragToTab(evt.nativeEvent.pageX);
+      },
+      onPanResponderRelease: (evt) => {
+        handleDragToTab(evt.nativeEvent.pageX);
+      },
+    })
+  ).current;
 
   // Self-Analytics & Pacing State
   const [analyticsData, setAnalyticsData] = useState<AnalyticsOverview | null>(null);
@@ -170,9 +239,9 @@ function MainScreen() {
     setTestResult(null);
     try {
       const res = await MobileApi.testAIConnection(apiKeyInput || undefined, selectedModel);
-      setTestResult(res.success ? '✓ Connected to Gemini!' : `✗ ${res.message}`);
+      setTestResult(res.success ? 'Connected to Gemini successfully!' : `Connection failed: ${res.message}`);
     } catch (e: any) {
-      setTestResult(`✗ ${e.message}`);
+      setTestResult(`Connection error: ${e.message}`);
     } finally {
       setTestingKey(false);
     }
@@ -346,7 +415,17 @@ function MainScreen() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/* 1. TOP FLOATING ISLAND NAVIGATION */}
-      <View style={[styles.topIsland, { backgroundColor: isDark ? 'rgba(22, 25, 23, 0.94)' : 'rgba(255, 255, 255, 0.94)', borderColor: isDark ? '#262A27' : '#E2E3DC' }]}>
+      <View
+        style={[
+          styles.topIsland,
+          {
+            backgroundColor: isDark ? '#161917' : '#FFFFFF',
+            borderColor: isDark ? '#262A27' : '#D8DBD2',
+            shadowColor: isDark ? '#000000' : '#161917',
+            shadowOpacity: isDark ? 0.35 : 0.09,
+          },
+        ]}
+      >
         <View style={styles.topIslandRow}>
           {/* Brand & Stage cluster */}
           <TouchableOpacity
@@ -380,17 +459,17 @@ function MainScreen() {
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => setSearchOpen(!searchOpen)}
-              style={[styles.topIconBtn, { backgroundColor: searchOpen ? (isDark ? '#2E3330' : '#E2E3DC') : (isDark ? '#202422' : '#F0F1EC'), borderColor: isDark ? '#2E3330' : '#E2E3DC' }]}
+              style={[styles.topIconBtn, { backgroundColor: searchOpen ? (isDark ? '#2E3330' : '#E0E3DA') : (isDark ? '#202422' : '#EFF1EA'), borderColor: isDark ? '#2E3330' : '#D8DBD2' }]}
             >
-              <Text style={[styles.topIconSymbol, { color: isDark ? '#FFFFFF' : '#161917' }]}>🔍</Text>
+              <SearchIcon size={16} color={isDark ? '#FFFFFF' : '#161917'} />
             </TouchableOpacity>
 
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => setTheme(isDark ? 'light' : 'dark')}
-              style={[styles.topIconBtn, { backgroundColor: isDark ? '#202422' : '#F0F1EC', borderColor: isDark ? '#2E3330' : '#E2E3DC' }]}
+              style={[styles.topIconBtn, { backgroundColor: isDark ? '#202422' : '#EFF1EA', borderColor: isDark ? '#2E3330' : '#D8DBD2' }]}
             >
-              <Text style={[styles.topIconSymbol, { color: isDark ? '#FCE8A6' : '#634800' }]}>{isDark ? '🌙' : '☀️'}</Text>
+              {isDark ? <MoonIcon size={16} color="#FCE8A6" /> : <SunIcon size={16} color="#D97706" />}
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -419,7 +498,7 @@ function MainScreen() {
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.topSearchClearBtn}>
-                <Text style={{ color: isDark ? '#A3AAA4' : '#70746E', fontSize: 12, fontWeight: 'bold' }}>✕</Text>
+                <CloseIcon size={12} color={isDark ? '#A3AAA4' : '#70746E'} />
               </TouchableOpacity>
             )}
           </View>
@@ -451,9 +530,14 @@ function MainScreen() {
                     selectedTopic.user_status === 'COMPLETED' ? styles.statusPillComplete : styles.statusPillTodo,
                   ]}
                 >
-                  <Text style={styles.statusPillText}>
-                    {selectedTopic.user_status === 'COMPLETED' ? '✓ Completed' : 'Mark Done'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    {selectedTopic.user_status === 'COMPLETED' && (
+                      <CheckIcon size={11} color="#0D381E" />
+                    )}
+                    <Text style={styles.statusPillText}>
+                      {selectedTopic.user_status === 'COMPLETED' ? 'Completed' : 'Mark Done'}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               </View>
               <Text style={styles.topicDetailTitle}>{selectedTopic.title}</Text>
@@ -541,7 +625,7 @@ function MainScreen() {
                       style={styles.checkIconBtn}
                     >
                       <Text style={[styles.checkIcon, isDone ? styles.checkDone : styles.checkTodo]}>
-                        {isDone ? '✓' : '○'}
+                        isDone ? <CheckIcon size={11} color={isDark ? '#9DE8BA' : '#161917'} /> : <View style={{ width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: isDark ? '#767C77' : '#8E928C' }} />
                       </Text>
                     </TouchableOpacity>
                     <View style={{ flex: 1 }}>
@@ -587,9 +671,16 @@ function MainScreen() {
                     focusedTask.user_status === 'COMPLETED' ? styles.statusPillComplete : styles.statusPillTodo,
                   ]}
                 >
-                  <Text style={styles.statusPillText}>
-                    {focusedTask.user_status === 'COMPLETED' ? '✓ Completed' : '○ Mark Complete'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                    {focusedTask.user_status === 'COMPLETED' ? (
+                      <CheckIcon size={12} color="#0D381E" />
+                    ) : (
+                      <View style={{ width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: '#767C77' }} />
+                    )}
+                    <Text style={styles.statusPillText}>
+                      {focusedTask.user_status === 'COMPLETED' ? 'Completed' : 'Mark Complete'}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               </View>
 
@@ -731,7 +822,7 @@ function MainScreen() {
                         style={styles.taskToggleInline}
                       >
                         <Text style={[styles.checkIcon, isDone ? (isDark ? { color: '#9DE8BA' } : styles.checkDone) : styles.checkTodo]}>
-                          {isDone ? '✓' : '○'}
+                          isDone ? <CheckIcon size={11} color={isDark ? '#9DE8BA' : '#161917'} /> : <View style={{ width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: isDark ? '#767C77' : '#8E928C' }} />
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -1322,7 +1413,7 @@ function MainScreen() {
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setQuickHubVisible(false)} style={{ padding: 4 }}>
-                <Text style={{ color: isDark ? '#767C77' : '#8E928C', fontSize: 13, fontWeight: 'bold' }}>✕</Text>
+                <CloseIcon size={14} color={isDark ? '#767C77' : '#8E928C'} />
               </TouchableOpacity>
             </View>
 
@@ -1351,7 +1442,7 @@ function MainScreen() {
                   },
                 ]}
               >
-                <Text style={styles.quickHubIcon}>⌂</Text>
+                <HomeIcon size={18} color={activeTab === "Home" ? (isDark ? "#9DE8BA" : "#161917") : (isDark ? "#A3AAA4" : "#70746E")} />
                 <Text style={[styles.quickHubLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>Dashboard</Text>
                 <Text style={[styles.quickHubSub, { color: isDark ? '#A3AAA4' : '#70746E' }]}>Readiness plan</Text>
               </TouchableOpacity>
@@ -1378,7 +1469,7 @@ function MainScreen() {
                   },
                 ]}
               >
-                <Text style={styles.quickHubIcon}>⊞</Text>
+                <LearnIcon size={18} color={activeTab === "Learn" ? (isDark ? "#9DE8BA" : "#161917") : (isDark ? "#A3AAA4" : "#70746E")} />
                 <Text style={[styles.quickHubLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>Learn</Text>
                 <Text style={[styles.quickHubSub, { color: isDark ? '#A3AAA4' : '#70746E' }]}>BM1 & BM2 topics</Text>
               </TouchableOpacity>
@@ -1405,7 +1496,7 @@ function MainScreen() {
                   },
                 ]}
               >
-                <Text style={styles.quickHubIcon}>✓</Text>
+                <TasksIcon size={18} color={activeTab === "Tasks" ? (isDark ? "#9DE8BA" : "#161917") : (isDark ? "#A3AAA4" : "#70746E")} />
                 <Text style={[styles.quickHubLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>Tasks</Text>
                 <Text style={[styles.quickHubSub, { color: isDark ? '#A3AAA4' : '#70746E' }]}>{allTasksList.length} workouts</Text>
               </TouchableOpacity>
@@ -1432,7 +1523,7 @@ function MainScreen() {
                   },
                 ]}
               >
-                <Text style={styles.quickHubIcon}>◈</Text>
+                <ToiIcon size={18} color={activeTab === "TOI" ? (isDark ? "#9DE8BA" : "#161917") : (isDark ? "#A3AAA4" : "#70746E")} />
                 <Text style={[styles.quickHubLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>TOI Mock</Text>
                 <Text style={[styles.quickHubSub, { color: isDark ? '#A3AAA4' : '#70746E' }]}>Interview sim</Text>
               </TouchableOpacity>
@@ -1456,7 +1547,7 @@ function MainScreen() {
                 }}
                 style={[styles.quickHubShortcutBtn, { backgroundColor: isDark ? '#202422' : '#F0F1EC', borderColor: isDark ? '#2E3330' : '#E2E3DC' }]}
               >
-                <Text style={styles.quickHubShortcutIcon}>⚡</Text>
+                <ZapIcon size={16} color={isDark ? "#FCD34D" : "#D97706"} />
                 <Text style={[styles.quickHubShortcutLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>Priority Drill</Text>
               </TouchableOpacity>
 
@@ -1471,7 +1562,7 @@ function MainScreen() {
                 }}
                 style={[styles.quickHubShortcutBtn, { backgroundColor: isDark ? '#202422' : '#F0F1EC', borderColor: isDark ? '#2E3330' : '#E2E3DC' }]}
               >
-                <Text style={styles.quickHubShortcutIcon}>↗</Text>
+                <StatsIcon size={16} color={isDark ? "#9DE8BA" : "#161917"} />
                 <Text style={[styles.quickHubShortcutLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>Telemetry</Text>
               </TouchableOpacity>
 
@@ -1483,7 +1574,7 @@ function MainScreen() {
                 }}
                 style={[styles.quickHubShortcutBtn, { backgroundColor: isDark ? '#202422' : '#F0F1EC', borderColor: isDark ? '#2E3330' : '#E2E3DC' }]}
               >
-                <Text style={styles.quickHubShortcutIcon}>⚙️</Text>
+                <SettingsIcon size={16} color={isDark ? "#9DE8BA" : "#161917"} />
                 <Text style={[styles.quickHubShortcutLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>BYOK AI</Text>
               </TouchableOpacity>
 
@@ -1495,7 +1586,7 @@ function MainScreen() {
                 }}
                 style={[styles.quickHubShortcutBtn, { backgroundColor: isDark ? '#202422' : '#F0F1EC', borderColor: isDark ? '#2E3330' : '#E2E3DC' }]}
               >
-                <Text style={styles.quickHubShortcutIcon}>👤</Text>
+                <UserIcon size={16} color={isDark ? "#93C5FD" : "#2563EB"} />
                 <Text style={[styles.quickHubShortcutLabel, { color: isDark ? '#FFFFFF' : '#161917' }]}>Partner</Text>
               </TouchableOpacity>
             </View>
@@ -1503,14 +1594,19 @@ function MainScreen() {
         </View>
       )}
 
-      {/* 3. MINIMAL FLOATING BOTTOM MENU BAR (5 SLOTS WITH CENTER HOME HUB) */}
+      {/* 3. MINIMAL FLOATING BOTTOM MENU BAR (DRAG TO SELECT + ACCORDING THEME STYLING) */}
       <View
+        ref={navBarViewRef}
+        onLayout={measureNavBar}
+        {...bottomBarPanResponder.panHandlers}
         style={[
           styles.bottomNavIsland,
           {
             bottom: insets.bottom > 0 ? insets.bottom : 12,
-            backgroundColor: isDark ? 'rgba(20, 24, 22, 0.94)' : 'rgba(255, 255, 255, 0.94)',
-            borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+            backgroundColor: isDark ? '#161917' : '#FFFFFF',
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : '#D8DBD2',
+            shadowColor: isDark ? '#000000' : '#161917',
+            shadowOpacity: isDark ? 0.45 : 0.14,
           },
         ]}
       >
@@ -1525,9 +1621,30 @@ function MainScreen() {
           }}
           style={styles.navSlot}
         >
-          <View style={[styles.navSlotPill, activeTab === 'Learn' && !selectedArea && !selectedTopic && !focusedTask && (isDark ? styles.navSlotActiveDark : styles.navSlotActiveLight)]}>
-            <Text style={[styles.navIconText, activeTab === 'Learn' && (isDark ? styles.navIconActiveDark : styles.navIconActiveLight)]}>⊞</Text>
-            <Text style={[styles.navLabel, activeTab === 'Learn' ? (isDark ? styles.navLabelActiveDark : styles.navLabelActiveLight) : (isDark ? styles.navLabelInactiveDark : styles.navLabelInactiveLight)]}>
+          <View
+            style={[
+              styles.navSlotPill,
+              activeTab === 'Learn' && !selectedArea && !selectedTopic && !focusedTask
+                ? (isDark ? styles.navSlotActiveDark : styles.navSlotActiveLight)
+                : null,
+            ]}
+          >
+            <LearnIcon
+              size={18}
+              color={
+                activeTab === 'Learn' && !selectedArea && !selectedTopic && !focusedTask
+                  ? (isDark ? '#9DE8BA' : '#161917')
+                  : (isDark ? '#8E958F' : '#636964')
+              }
+            />
+            <Text
+              style={[
+                styles.navLabel,
+                activeTab === 'Learn' && !selectedArea && !selectedTopic && !focusedTask
+                  ? (isDark ? styles.navLabelActiveDark : styles.navLabelActiveLight)
+                  : (isDark ? styles.navLabelInactiveDark : styles.navLabelInactiveLight),
+              ]}
+            >
               Learn
             </Text>
           </View>
@@ -1544,9 +1661,30 @@ function MainScreen() {
           }}
           style={styles.navSlot}
         >
-          <View style={[styles.navSlotPill, activeTab === 'Tasks' && !focusedTask && (isDark ? styles.navSlotActiveDark : styles.navSlotActiveLight)]}>
-            <Text style={[styles.navIconText, activeTab === 'Tasks' && (isDark ? styles.navIconActiveDark : styles.navIconActiveLight)]}>✓</Text>
-            <Text style={[styles.navLabel, activeTab === 'Tasks' ? (isDark ? styles.navLabelActiveDark : styles.navLabelActiveLight) : (isDark ? styles.navLabelInactiveDark : styles.navLabelInactiveLight)]}>
+          <View
+            style={[
+              styles.navSlotPill,
+              activeTab === 'Tasks' && !focusedTask
+                ? (isDark ? styles.navSlotActiveDark : styles.navSlotActiveLight)
+                : null,
+            ]}
+          >
+            <TasksIcon
+              size={18}
+              color={
+                activeTab === 'Tasks' && !focusedTask
+                  ? (isDark ? '#9DE8BA' : '#161917')
+                  : (isDark ? '#8E958F' : '#636964')
+              }
+            />
+            <Text
+              style={[
+                styles.navLabel,
+                activeTab === 'Tasks' && !focusedTask
+                  ? (isDark ? styles.navLabelActiveDark : styles.navLabelActiveLight)
+                  : (isDark ? styles.navLabelInactiveDark : styles.navLabelInactiveLight),
+              ]}
+            >
               Tasks
             </Text>
           </View>
@@ -1576,16 +1714,14 @@ function MainScreen() {
                 : (isDark ? styles.navCenterHubInactiveDark : styles.navCenterHubInactiveLight),
             ]}
           >
-            <Text
-              style={[
-                styles.navCenterHubIcon,
+            <HomeIcon
+              size={21}
+              color={
                 activeTab === 'Home' && !selectedArea && !selectedTopic && !focusedTask
-                  ? (isDark ? styles.navCenterHubIconActiveDark : styles.navCenterHubIconActiveLight)
-                  : (isDark ? styles.navCenterHubIconInactiveDark : styles.navCenterHubIconInactiveLight),
-              ]}
-            >
-              ⌂
-            </Text>
+                  ? (isDark ? '#0D381E' : '#FFFFFF')
+                  : (isDark ? '#E2E8F0' : '#161917')
+              }
+            />
           </View>
         </TouchableOpacity>
 
@@ -1600,9 +1736,30 @@ function MainScreen() {
           }}
           style={styles.navSlot}
         >
-          <View style={[styles.navSlotPill, activeTab === 'TOI' && (isDark ? styles.navSlotActiveDark : styles.navSlotActiveLight)]}>
-            <Text style={[styles.navIconText, activeTab === 'TOI' && (isDark ? styles.navIconActiveDark : styles.navIconActiveLight)]}>◈</Text>
-            <Text style={[styles.navLabel, activeTab === 'TOI' ? (isDark ? styles.navLabelActiveDark : styles.navLabelActiveLight) : (isDark ? styles.navLabelInactiveDark : styles.navLabelInactiveLight)]}>
+          <View
+            style={[
+              styles.navSlotPill,
+              activeTab === 'TOI'
+                ? (isDark ? styles.navSlotActiveDark : styles.navSlotActiveLight)
+                : null,
+            ]}
+          >
+            <ToiIcon
+              size={18}
+              color={
+                activeTab === 'TOI'
+                  ? (isDark ? '#9DE8BA' : '#161917')
+                  : (isDark ? '#8E958F' : '#636964')
+              }
+            />
+            <Text
+              style={[
+                styles.navLabel,
+                activeTab === 'TOI'
+                  ? (isDark ? styles.navLabelActiveDark : styles.navLabelActiveLight)
+                  : (isDark ? styles.navLabelInactiveDark : styles.navLabelInactiveLight),
+              ]}
+            >
               TOI
             </Text>
           </View>
@@ -1619,9 +1776,30 @@ function MainScreen() {
           }}
           style={styles.navSlot}
         >
-          <View style={[styles.navSlotPill, activeTab === 'Progress' && (isDark ? styles.navSlotActiveDark : styles.navSlotActiveLight)]}>
-            <Text style={[styles.navIconText, activeTab === 'Progress' && (isDark ? styles.navIconActiveDark : styles.navIconActiveLight)]}>↗</Text>
-            <Text style={[styles.navLabel, activeTab === 'Progress' ? (isDark ? styles.navLabelActiveDark : styles.navLabelActiveLight) : (isDark ? styles.navLabelInactiveDark : styles.navLabelInactiveLight)]}>
+          <View
+            style={[
+              styles.navSlotPill,
+              activeTab === 'Progress'
+                ? (isDark ? styles.navSlotActiveDark : styles.navSlotActiveLight)
+                : null,
+            ]}
+          >
+            <StatsIcon
+              size={18}
+              color={
+                activeTab === 'Progress'
+                  ? (isDark ? '#9DE8BA' : '#161917')
+                  : (isDark ? '#8E958F' : '#636964')
+              }
+            />
+            <Text
+              style={[
+                styles.navLabel,
+                activeTab === 'Progress'
+                  ? (isDark ? styles.navLabelActiveDark : styles.navLabelActiveLight)
+                  : (isDark ? styles.navLabelInactiveDark : styles.navLabelInactiveLight),
+              ]}
+            >
               Stats
             </Text>
           </View>
@@ -1654,7 +1832,7 @@ function MainScreen() {
                 onPress={() => setProfileModalVisible(false)}
                 style={styles.modalCloseBtn}
               >
-                <Text style={[styles.modalCloseBtnText, isDark && { color: '#A3AAA4' }]}>✕</Text>
+                <CloseIcon size={18} color={isDark ? '#A3AAA4' : '#70746E'} />
               </TouchableOpacity>
             </View>
 
@@ -1680,7 +1858,7 @@ function MainScreen() {
                   <Text style={[styles.logoPickerSub, isDark && { color: '#A3AAA4' }]}>Auto</Text>
                   {logoTheme === 'auto' && (
                     <View style={[styles.logoActiveCheck, isDark && { backgroundColor: '#9DE8BA' }]}>
-                      <Text style={{ fontSize: 9, color: isDark ? '#0D381E' : '#FFFFFF', fontWeight: 'bold' }}>✓</Text>
+                      <CheckIcon size={10} color={isDark ? '#0D381E' : '#FFFFFF'} />
                     </View>
                   )}
                 </TouchableOpacity>
@@ -1700,7 +1878,7 @@ function MainScreen() {
                   <Text style={[styles.logoPickerSub, isDark && { color: '#A3AAA4' }]}>Obsidian</Text>
                   {logoTheme === 'dark' && (
                     <View style={[styles.logoActiveCheck, isDark && { backgroundColor: '#9DE8BA' }]}>
-                      <Text style={{ fontSize: 9, color: isDark ? '#0D381E' : '#FFFFFF', fontWeight: 'bold' }}>✓</Text>
+                      <CheckIcon size={10} color={isDark ? '#0D381E' : '#FFFFFF'} />
                     </View>
                   )}
                 </TouchableOpacity>
@@ -1720,7 +1898,7 @@ function MainScreen() {
                   <Text style={[styles.logoPickerSub, isDark && { color: '#A3AAA4' }]}>Frosted</Text>
                   {logoTheme === 'light' && (
                     <View style={[styles.logoActiveCheck, isDark && { backgroundColor: '#9DE8BA' }]}>
-                      <Text style={{ fontSize: 9, color: isDark ? '#0D381E' : '#FFFFFF', fontWeight: 'bold' }}>✓</Text>
+                      <CheckIcon size={10} color={isDark ? '#0D381E' : '#FFFFFF'} />
                     </View>
                   )}
                 </TouchableOpacity>
@@ -2824,9 +3002,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 8,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
     shadowRadius: 18,
     elevation: 12,
   },
@@ -2842,12 +3018,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderRadius: 18,
     minWidth: 50,
+    gap: 3,
   },
   navSlotActiveDark: {
-    backgroundColor: '#202422',
+    backgroundColor: '#202623',
+    borderWidth: 1,
+    borderColor: '#2E3632',
   },
   navSlotActiveLight: {
-    backgroundColor: '#F0F1EC',
+    backgroundColor: '#EFF1EA',
+    borderWidth: 1,
+    borderColor: '#DFE2D8',
   },
   navIconText: {
     fontSize: 16,
@@ -2875,10 +3056,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   navLabelInactiveDark: {
-    color: '#767C77',
+    color: '#8E958F',
   },
   navLabelInactiveLight: {
-    color: '#8E928C',
+    color: '#636964',
   },
 
   // Center Home Hub Button
@@ -2911,9 +3092,9 @@ const styles = StyleSheet.create({
     borderColor: '#2E3330',
   },
   navCenterHubInactiveLight: {
-    backgroundColor: '#F0F1EC',
+    backgroundColor: '#EFF1EA',
     borderWidth: 1,
-    borderColor: '#E2E3DC',
+    borderColor: '#D8DBD2',
   },
   navCenterHubIcon: {
     fontSize: 22,
