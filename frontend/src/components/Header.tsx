@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import logoDark from '../assets/logo-dark.png';
+import logoLight from '../assets/logo-light.png';
 import {
   Sun,
   Moon,
@@ -31,7 +33,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
 }) => {
   const { user, switchDemoUser } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, toggleTheme, logoTheme, setLogoTheme, activeLogo } = useTheme();
   const [switching, setSwitching] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -89,9 +91,11 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={() => setCurrentTab('dashboard')}
           className="flex items-center space-x-2.5 cursor-pointer group"
         >
-          <div className="w-8 h-8 rounded-2xl bg-[#161917] dark:bg-white text-white dark:text-[#161917] flex items-center justify-center font-bold text-xs shadow-xs group-hover:scale-105 transition-transform">
-            ▲
-          </div>
+          <img
+            src={activeLogo}
+            alt="LIFT"
+            className="w-8 h-8 rounded-xl object-contain shadow-xs group-hover:scale-105 transition-transform"
+          />
           <div className="flex flex-col">
             <span className="font-bold text-[#161917] dark:text-white text-sm tracking-tight leading-none">
               LIFT
@@ -154,7 +158,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Account Popover */}
           {isDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#161917] border border-[#E3E5DE] dark:border-[#2E3330] rounded-2xl p-2 shadow-xl z-50 space-y-1.5 animate-in fade-in duration-150">
+            <div className="absolute right-0 mt-2 w-60 bg-white dark:bg-[#161917] border border-[#E3E5DE] dark:border-[#2E3330] rounded-2xl p-2 shadow-xl z-50 space-y-1.5 animate-in fade-in duration-150">
               <div className="px-3 py-2 border-b border-[#F0F1EC] dark:border-[#262A27]">
                 <p className="text-xs font-bold text-[#161917] dark:text-white truncate">
                   {user?.full_name || user?.username}
@@ -198,6 +202,56 @@ export const Header: React.FC<HeaderProps> = ({
                   <span>Partner</span>
                   {user?.username === 'user2' && <Check className="w-3.5 h-3.5" />}
                 </button>
+              </div>
+
+              {/* App Icon / Logo Theme Switcher */}
+              <div className="px-1 py-1 border-t border-[#F0F1EC] dark:border-[#262A27]">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#888F89] px-2 block mb-1">
+                  App Logo & Icon
+                </span>
+                <div className="grid grid-cols-3 gap-1 px-1">
+                  <button
+                    onClick={() => setLogoTheme('auto')}
+                    title="Adaptive (Follows Theme)"
+                    className={`flex flex-col items-center py-1.5 px-1 rounded-xl text-[10px] font-medium border transition-colors ${
+                      logoTheme === 'auto'
+                        ? 'border-[#161917] dark:border-white bg-[#F0F1EC] dark:bg-[#202422] text-[#161917] dark:text-white font-bold'
+                        : 'border-transparent text-[#888F89] hover:bg-[#F0F1EC] dark:hover:bg-[#222624]'
+                    }`}
+                  >
+                    <div className="flex items-center -space-x-1 mb-1">
+                      <img src={logoDark} className="w-4 h-4 rounded" alt="dark" />
+                      <img src={logoLight} className="w-4 h-4 rounded" alt="light" />
+                    </div>
+                    <span>Auto</span>
+                  </button>
+
+                  <button
+                    onClick={() => setLogoTheme('dark')}
+                    title="Onyx Dark Icon"
+                    className={`flex flex-col items-center py-1.5 px-1 rounded-xl text-[10px] font-medium border transition-colors ${
+                      logoTheme === 'dark'
+                        ? 'border-[#161917] dark:border-white bg-[#F0F1EC] dark:bg-[#202422] text-[#161917] dark:text-white font-bold'
+                        : 'border-transparent text-[#888F89] hover:bg-[#F0F1EC] dark:hover:bg-[#222624]'
+                    }`}
+                  >
+                    <img src={logoDark} className="w-4 h-4 rounded mb-1" alt="dark" />
+                    <span>Onyx</span>
+                  </button>
+
+                  <button
+                    onClick={() => setLogoTheme('light')}
+                    title="Alabaster Light Icon"
+                    className={`flex flex-col items-center py-1.5 px-1 rounded-xl text-[10px] font-medium border transition-colors ${
+                      logoTheme === 'light'
+                        ? 'border-[#161917] dark:border-white bg-[#F0F1EC] dark:bg-[#202422] text-[#161917] dark:text-white font-bold'
+                        : 'border-transparent text-[#888F89] hover:bg-[#F0F1EC] dark:hover:bg-[#222624]'
+                    }`}
+                  >
+                    <img src={logoLight} className="w-4 h-4 rounded mb-1" alt="light" />
+                    <span>Light</span>
+                  </button>
+                </div>
               </div>
 
               <div className="pt-1 border-t border-[#F0F1EC] dark:border-[#262A27]">

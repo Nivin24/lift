@@ -4,14 +4,22 @@
     "slug": "lift-app",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#090B10",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#090B10"
+    },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.lift.prep"
+      "bundleIdentifier": "com.lift.prep",
+      "icon": "./assets/icon.png"
     },
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#090B10"
       },
       "package": "com.lift.prep"

@@ -10,10 +10,14 @@ import {
   Alert,
   TextInput,
   Modal,
+  Image,
 } from 'react-native';
 import { SafeAreaView, SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MobileApi, MobileTopicSummary, MobileTopicDetail, MobileUser } from './src/services/api';
 import { DashboardOverview, Task, LearningAreaProgress, AnalyticsOverview } from './src/types';
+
+const logoDark = require('./assets/logo-dark.png');
+const logoLight = require('./assets/logo-light.png');
 
 function MainScreen() {
   const insets = useSafeAreaInsets();
@@ -43,6 +47,17 @@ function MainScreen() {
   // Theme state: dark (default matching web workspace) | light
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const isDark = theme === 'dark';
+
+  // App Logo Theme Switcher: 'auto' (tracks dark/light) | 'dark' (Onyx) | 'light' (Alabaster Glass)
+  const [logoTheme, setLogoTheme] = useState<'auto' | 'dark' | 'light'>('auto');
+  const activeLogo =
+    logoTheme === 'dark'
+      ? logoDark
+      : logoTheme === 'light'
+      ? logoLight
+      : isDark
+      ? logoDark
+      : logoLight;
 
   // Center Home Quick Actions Dock state
   const [quickHubVisible, setQuickHubVisible] = useState(false);
@@ -344,9 +359,11 @@ function MainScreen() {
             }}
             style={styles.topBrandCluster}
           >
-            <View style={[styles.topBrandLogo, { backgroundColor: isDark ? '#9DE8BA' : '#161917' }]}>
-              <Text style={[styles.topBrandLogoText, { color: isDark ? '#0D381E' : '#FFFFFF' }]}>▲</Text>
-            </View>
+            <Image
+              source={activeLogo}
+              style={styles.topBrandLogoImage}
+              resizeMode="contain"
+            />
             <View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Text style={[styles.topBrandName, { color: isDark ? '#FFFFFF' : '#161917' }]}>LIFT</Text>
@@ -1294,8 +1311,12 @@ function MainScreen() {
             </View>
 
             <View style={[styles.quickHubHeader, { borderBottomColor: isDark ? '#262A27' : '#F0F1EC' }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <View style={[styles.quickHubHeaderDot, { backgroundColor: isDark ? '#9DE8BA' : '#161917' }]} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Image
+                  source={activeLogo}
+                  style={{ width: 22, height: 22, borderRadius: 6 }}
+                  resizeMode="contain"
+                />
                 <Text style={[styles.quickHubHeaderTitle, { color: isDark ? '#FFFFFF' : '#161917' }]}>
                   LIFT NAVIGATION & QUICK HUB
                 </Text>
@@ -1619,9 +1640,11 @@ function MainScreen() {
             {/* Modal Header */}
             <View style={[styles.modalHeaderRow, isDark && { borderBottomColor: '#262A27' }]}>
               <View style={styles.modalUserHeader}>
-                <View style={[styles.modalAvatarCircle, isDark && { backgroundColor: '#202422', borderColor: '#2E3330', borderWidth: 1 }]}>
-                  <Text style={[styles.modalAvatarText, isDark && { color: '#9DE8BA' }]}>{userInitial}</Text>
-                </View>
+                <Image
+                  source={activeLogo}
+                  style={{ width: 44, height: 44, borderRadius: 12 }}
+                  resizeMode="contain"
+                />
                 <View>
                   <Text style={[styles.modalUserName, isDark && { color: '#FFFFFF' }]}>{currentUser?.full_name || currentUser?.username || 'User'}</Text>
                   <Text style={[styles.modalUserEmail, isDark && { color: '#A3AAA4' }]}>{currentUser?.email || 'Logged in'}</Text>
@@ -1635,7 +1658,74 @@ function MainScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ maxHeight: 420 }}>
+            <ScrollView style={{ maxHeight: 440 }}>
+              {/* App Icon / Logo Theme Switcher */}
+              <Text style={[styles.modalSectionLabel, isDark && { color: '#888F89' }]}>APP ICON & LOGO THEME</Text>
+              <View style={styles.logoPickerRow}>
+                {/* Auto / Adaptive */}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setLogoTheme('auto')}
+                  style={[
+                    styles.logoPickerCard,
+                    isDark && { backgroundColor: '#202422', borderColor: '#2E3330' },
+                    logoTheme === 'auto' && (isDark ? { borderColor: '#9DE8BA', backgroundColor: '#1C2921' } : { borderColor: '#161917', backgroundColor: '#F0F1EC' }),
+                  ]}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                    <Image source={logoDark} style={{ width: 22, height: 22, borderRadius: 6, marginRight: -6, zIndex: 1 }} resizeMode="contain" />
+                    <Image source={logoLight} style={{ width: 22, height: 22, borderRadius: 6 }} resizeMode="contain" />
+                  </View>
+                  <Text style={[styles.logoPickerTitle, isDark && { color: '#FFFFFF' }]}>Adaptive</Text>
+                  <Text style={[styles.logoPickerSub, isDark && { color: '#A3AAA4' }]}>Auto</Text>
+                  {logoTheme === 'auto' && (
+                    <View style={[styles.logoActiveCheck, isDark && { backgroundColor: '#9DE8BA' }]}>
+                      <Text style={{ fontSize: 9, color: isDark ? '#0D381E' : '#FFFFFF', fontWeight: 'bold' }}>✓</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                {/* Onyx Dark */}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setLogoTheme('dark')}
+                  style={[
+                    styles.logoPickerCard,
+                    isDark && { backgroundColor: '#202422', borderColor: '#2E3330' },
+                    logoTheme === 'dark' && (isDark ? { borderColor: '#9DE8BA', backgroundColor: '#1C2921' } : { borderColor: '#161917', backgroundColor: '#F0F1EC' }),
+                  ]}
+                >
+                  <Image source={logoDark} style={{ width: 32, height: 32, borderRadius: 8 }} resizeMode="contain" />
+                  <Text style={[styles.logoPickerTitle, isDark && { color: '#FFFFFF' }]}>Onyx Dark</Text>
+                  <Text style={[styles.logoPickerSub, isDark && { color: '#A3AAA4' }]}>Obsidian</Text>
+                  {logoTheme === 'dark' && (
+                    <View style={[styles.logoActiveCheck, isDark && { backgroundColor: '#9DE8BA' }]}>
+                      <Text style={{ fontSize: 9, color: isDark ? '#0D381E' : '#FFFFFF', fontWeight: 'bold' }}>✓</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                {/* Alabaster Light */}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setLogoTheme('light')}
+                  style={[
+                    styles.logoPickerCard,
+                    isDark && { backgroundColor: '#202422', borderColor: '#2E3330' },
+                    logoTheme === 'light' && (isDark ? { borderColor: '#9DE8BA', backgroundColor: '#1C2921' } : { borderColor: '#161917', backgroundColor: '#F0F1EC' }),
+                  ]}
+                >
+                  <Image source={logoLight} style={{ width: 32, height: 32, borderRadius: 8 }} resizeMode="contain" />
+                  <Text style={[styles.logoPickerTitle, isDark && { color: '#FFFFFF' }]}>Alabaster</Text>
+                  <Text style={[styles.logoPickerSub, isDark && { color: '#A3AAA4' }]}>Frosted</Text>
+                  {logoTheme === 'light' && (
+                    <View style={[styles.logoActiveCheck, isDark && { backgroundColor: '#9DE8BA' }]}>
+                      <Text style={{ fontSize: 9, color: isDark ? '#0D381E' : '#FFFFFF', fontWeight: 'bold' }}>✓</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
+
               {/* Quick Switch Demo Users */}
               <Text style={[styles.modalSectionLabel, isDark && { color: '#888F89' }]}>SWITCH ACTIVE USER</Text>
               <View style={styles.quickSwitchRow}>
@@ -3016,6 +3106,49 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginTop: 14,
     marginBottom: 8,
+  },
+  topBrandLogoImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+  },
+  logoPickerRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 6,
+  },
+  logoPickerCard: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E3DC',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    gap: 4,
+    position: 'relative',
+  },
+  logoPickerTitle: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  logoPickerSub: {
+    fontSize: 9.5,
+    fontFamily: 'monospace',
+    color: '#70746E',
+  },
+  logoActiveCheck: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#161917',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   quickSwitchRow: {
     flexDirection: 'row',
