@@ -48,14 +48,34 @@ class GeminiProvider(AIProvider):
         except httpx.RequestError as e:
             return {"success": False, "message": f"Network error connecting to Gemini API: {str(e)}"}
 
-    async def _generate_content_raw(self, api_key: str, model_name: str, system_prompt: str, user_prompt: str) -> str:
+    async def _generate_content_raw(
+        self,
+        api_key: str,
+        model_name: str,
+        system_prompt: str,
+        user_prompt: str,
+        media_bytes: Optional[bytes] = None,
+        mime_type: Optional[str] = None
+    ) -> str:
         url = f"{self.base_url}/models/{model_name}:generateContent?key={api_key}"
-        payload = {
+        parts: List[Dict[str, Any]] = []
+        if media_bytes and mime_type:
+            import base64
+            b64_data = base64.b64encode(media_bytes).decode('utf-8')
+            parts.append({
+                "inline_data": {
+                    "mime_type": mime_type,
+                    "data": b64_data
+                }
+            })
+        parts.append({"text": user_prompt})
+
+        payload: Dict[str, Any] = {
             "system_instruction": {
                 "parts": [{"text": system_prompt}]
             },
             "contents": [
-                {"role": "user", "parts": [{"text": user_prompt}]}
+                {"role": "user", "parts": parts}
             ],
             "generationConfig": {
                 "temperature": 0.2,
@@ -63,7 +83,7 @@ class GeminiProvider(AIProvider):
             }
         }
         
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=90.0) as client:
             resp = await client.post(url, json=payload)
             if resp.status_code != 200:
                 err_detail = "Failed to generate content"
@@ -213,4 +233,112 @@ class GeminiProvider(AIProvider):
         )
         user_prompt = f"Generate quick revision notes and memory hooks for '{topic_title}'."
         raw_json = await self._generate_content_raw(api_key, model_name, system_prompt, user_prompt)
+        return json.loads(raw_json)
+
+    async def extract_text_from_media(
+        self,
+        api_key: str,
+        model_name: str,
+        media_bytes: bytes,
+        mime_type: str,
+    ) -> Dict[str, Any]:
+        system_prompt = (
+            "You are an expert OCR and technical document understanding engine. "
+            "Analyze the attached document or image. Extract all text, headings, requirements, code snippets, "
+            "and diagram structures. Output a strict JSON object:\n"
+            "{\n"
+            '  "suggested_title": "Clear concise title for this machine task",\n'
+            '  "extracted_text": "Complete, verbatim and cleaned markdown transcription of all text, requirements, and notes in the document",\n'
+            '  "summary": "2-3 sentence overview of what the machine task requires"\n'
+            "}"
+        )
+        user_prompt = "Transcribe and extract the full requirements and content from this document/image into clean markdown."
+        raw_json = await self._generate_content_raw(
+            api_key=api_key,
+            model_name=model_name,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            media_bytes=media_bytes,
+            mime_type=mime_type
+        )
+        return json.loads(raw_json)
+
+    async def deconstruct_machine_task(
+        self,
+        api_key: str,
+        model_name: str,
+        spec_text: str,
+        title: str,
+        module_code: str = "BM1",
+        custom_instruction: Optional[str] = None
+    ) -> Dict[str, Any]:
+        system_prompt = (
+            "You are an elite Staff Software Architect and Technical Educator designing a low-cognitive-load, "
+            "step-by-step implementation plan for an intensive engineering machine task.\n"
+            "Your mission: Eliminate candidate overwhelm and cognitive overload by deconstructing the specification "
+            "into clear architectural components, an explicit requirements/edge-case checklist, and a phased weekly milestone roadmap.\n"
+            "Respond with a strict JSON object with this exact schema:\n"
+            "{\n"
+            '  "title": "Clear, professional task title",\n'
+            '  "overview": "1-2 sentence core purpose of this machine workout",\n'
+            '  "architecture": {\n'
+            '    "pattern": "e.g., Clean Architecture / Layered CLI Pipeline / Producer-Consumer / Event-Driven",\n'
+            '    "components": [\n'
+            '      {"name": "ComponentName", "responsibility": "Specific role and boundary", "methods_or_interfaces": ["func1()", "func2()"]}\n'
+            '    ],\n'
+            '    "data_flow": "Step-by-step description of data movement through the system",\n'
+            '    "diagram_ascii": "Clean ASCII or Mermaid component/flow diagram"\n'
+            '  },\n'
+            '  "requirements_matrix": {\n'
+            '    "core_requirements": ["Requirement 1", "Requirement 2"],\n'
+            '    "edge_cases": ["Edge case 1 (e.g. malformed inputs)", "Edge case 2 (e.g. boundary conditions)"],\n'
+            '    "testing_criteria": ["Unit test coverage goal", "Expected assertion or verification rule"]\n'
+            '  },\n'
+            '  "milestone_roadmap": [\n'
+            '    {\n'
+            '      "phase": 1,\n'
+            '      "title": "Phase 1: Foundation & Data Skeleton",\n'
+            '      "pacing": "Day 1-2 (or Hour 1)",\n'
+            '      "cognitive_focus": "Low cognitive load: set up project skeleton, schemas, and type definitions without complex logic.",\n'
+            '      "deliverables": ["Deliverable 1", "Deliverable 2"]\n'
+            '    },\n'
+            '    {\n'
+            '      "phase": 2,\n'
+            '      "title": "Phase 2: Core Engine & Business Logic",\n'
+            '      "pacing": "Day 3-4 (or Hour 2)",\n'
+            '      "cognitive_focus": "Focused logic: implement core algorithms and primary data processing.",\n'
+            '      "deliverables": ["Deliverable 1", "Deliverable 2"]\n'
+            '    },\n'
+            '    {\n'
+            '      "phase": 3,\n'
+            '      "title": "Phase 3: Interface, CLI/API & Input Validation",\n'
+            '      "pacing": "Day 5 (or Hour 3)",\n'
+            '      "cognitive_focus": "Integration: connect command line or API interface, argument parsing, and user feedback.",\n'
+            '      "deliverables": ["Deliverable 1", "Deliverable 2"]\n'
+            '    },\n'
+            '    {\n'
+            '      "phase": 4,\n'
+            '      "title": "Phase 4: Edge Cases, Resilience & Submission Polish",\n'
+            '      "pacing": "Day 6-7 (or Hour 4)",\n'
+            '      "cognitive_focus": "Quality assurance: harden against edge cases, write test suites, and polish documentation.",\n'
+            '      "deliverables": ["Deliverable 1", "Deliverable 2"]\n'
+            '    }\n'
+            '  ],\n'
+            '  "suggested_subtasks": [\n'
+            '    {"title": "Phase 1: Setup & Data Skeleton", "description": "Initialize repository structure, schemas, and type definitions.", "task_type": "CODING", "priority": "HIGH"},\n'
+            '    {"title": "Phase 2: Core Processing Engine", "description": "Implement core algorithms, data manipulation, and caching.", "task_type": "MACHINE_TASK", "priority": "URGENT"},\n'
+            '    {"title": "Phase 3: CLI/API & Argument Validation", "description": "Implement argument parsing, interface commands, and robust input validation.", "task_type": "CODING", "priority": "HIGH"},\n'
+            '    {"title": "Phase 4: Edge Case Hardening & Tests", "description": "Add boundary condition unit tests, error handling, and documentation.", "task_type": "PRACTICE", "priority": "HIGH"}\n'
+            '  ]\n'
+            "}"
+        )
+        user_prompt = f"Deconstruct and architect the following machine task specification for stage '{module_code}':\n\nTask Title: {title}\n\nSpecification Details:\n{spec_text}"
+        if custom_instruction:
+            user_prompt += f"\n\nCandidate Preference/Focus: {custom_instruction}"
+        raw_json = await self._generate_content_raw(
+            api_key=api_key,
+            model_name=model_name,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt
+        )
         return json.loads(raw_json)

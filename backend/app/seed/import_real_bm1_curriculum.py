@@ -7,6 +7,8 @@ from app.models.entities import (
     UserTopicProgress, UserTaskProgress, UserProgress, ActivityLog
 )
 from app.services.progression import ProgressionEngine
+from app.seed.dsa_curriculum_data import DSA_TOPICS
+from app.seed.data_handling_curriculum_data import DATA_HANDLING_TOPICS
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("lift.curriculum")
@@ -1081,163 +1083,11 @@ def test_fetch_rate(mock_get):
         other_areas_topics = [
             {
                 "area_code": "data-handling",
-                "topics": [
-                    {
-                        "slug": "numpy-vectorization-and-arrays",
-                        "title": "NumPy: Array Mechanics, Indexing & Vectorization",
-                        "summary": "N-dimensional array creation, broadcasting rules, vectorization vs loops, slicing, and mathematical operations.",
-                        "difficulty": "INTERMEDIATE",
-                        "learning_objective": "Master NumPy array structures, memory strides, vectorization principles, and high-performance array operations.",
-                        "prerequisites": "Python Fundamentals, Matrix Concepts",
-                        "expected_outcome": "Able to eliminate Python loops using vectorized operations and implement complex multidimensional indexing.",
-                        "practice_requirement": "Implement 10 vectorized data transformations without Python for-loops.",
-                        "machine_task_relevance": "Directly required for high-throughput feature matrix construction and model preprocessing pipelines.",
-                        "practical_task_relevance": "Core tool for tabular data analysis and numeric feature engineering in real-world ML systems.",
-                        "interview_relevance": "Broadcasting rules, view vs copy memory allocation, and strided arrays are standard technical screen questions.",
-                        "subtopics": ["ndarray creation & dtypes", "Broadcasting rules & memory strides", "Fancy indexing & boolean masks", "Vectorized math operations & ufuncs", "Reshaping, stacking, and flattening"],
-                        "questions": [
-                            {
-                                "question_text": "Explain NumPy's broadcasting rules and when an operation will raise a ValueError.",
-                                "answer_text": "Broadcasting compares array shapes element-wise starting from trailing dimensions. Two dimensions are compatible when they are equal, or one of them is 1. If neither condition is met, a ValueError: operands could not be broadcast together is raised.",
-                                "difficulty": "INTERMEDIATE",
-                                "question_type": "INTERVIEW"
-                            }
-                        ],
-                        "resources": [
-                            {"title": "NumPy Official User Guide", "url": "https://numpy.org/doc/stable/user/index.html", "resource_type": "DOCUMENTATION"}
-                        ]
-                    },
-                    {
-                        "slug": "pandas-dataframes-and-manipulation",
-                        "title": "Pandas: DataFrames, Cleaning & GroupBy",
-                        "summary": "Series and DataFrames, missing data handling, filtering, aggregations, merges, joins, and reshaping.",
-                        "difficulty": "INTERMEDIATE",
-                        "learning_objective": "Manipulate tabular datasets, execute group aggregations, clean dirty inputs, and merge relational DataFrames efficiently.",
-                        "prerequisites": "NumPy Array Mechanics, Python Dictionaries",
-                        "expected_outcome": "Fluently perform exploratory data analysis, data cleansing, and multi-key joins on heterogeneous tabular data.",
-                        "practice_requirement": "Clean an impure 10,000-row real dataset and produce grouped summary reports.",
-                        "machine_task_relevance": "Primary library for ingesting, validating, and shaping data during timed machine tasks.",
-                        "practical_task_relevance": "Industry-standard data manipulation backbone for data science and machine learning pipelines.",
-                        "interview_relevance": "loc vs iloc distinctions, groupby aggregation syntax, and merge/join strategies are frequently tested.",
-                        "subtopics": ["Series & DataFrame fundamentals", "Handling NaN / Null values & imputation", "loc vs iloc indexing", "groupby, agg, and pivot_table", "merge, join, and concat operations"],
-                        "questions": [
-                            {
-                                "question_text": "What is the difference between df.loc and df.iloc in Pandas?",
-                                "answer_text": "df.loc is label-based, meaning you specify rows and columns by their index and column labels (inclusive of both start and stop bounds). df.iloc is integer position-based, following standard Python 0-indexed half-open slice conventions [start, stop).",
-                                "difficulty": "INTERMEDIATE",
-                                "question_type": "CONCEPTUAL"
-                            }
-                        ],
-                        "resources": [
-                            {"title": "Pandas API Reference", "url": "https://pandas.pydata.org/docs/reference/index.html", "resource_type": "DOCUMENTATION"}
-                        ]
-                    },
-                    {
-                        "slug": "matplotlib-data-visualization",
-                        "title": "Matplotlib & Seaborn: Visual Analytics",
-                        "summary": "Plotting line charts, scatter plots, histograms, boxplots, heatmaps, subplots, and formatting for reports.",
-                        "difficulty": "BEGINNER",
-                        "learning_objective": "Create informative publication-grade visual analytics, correlation heatmaps, and distribution plots.",
-                        "prerequisites": "Pandas DataFrames",
-                        "expected_outcome": "Generate multi-panel dashboards visualizing distributions, correlations, and model metrics.",
-                        "practice_requirement": "Plot a 4-panel visual exploratory dashboard for a dataset including histograms, boxplots, and heatmaps.",
-                        "machine_task_relevance": "Essential for presenting exploratory findings and evaluating model error distributions.",
-                        "practical_task_relevance": "Used for stakeholder reports and visual diagnosis of dataset anomalies.",
-                        "interview_relevance": "Demonstrating ability to interpret plots (e.g., boxplot quantiles, ROC curves) is critical in technical interviews.",
-                        "subtopics": ["Figure and Axes object-oriented API", "Distributions: histograms and KDE", "Relational: scatter and line plots", "Categorical: bar and box plots", "Heatmaps for correlation matrices"],
-                        "questions": [
-                            {
-                                "question_text": "Why is the object-oriented API (fig, ax = plt.subplots()) preferred over the state-based pyplot API (plt.plot())?",
-                                "answer_text": "The object-oriented API gives explicit control over individual Axes objects, avoids ambiguity in multi-plot figures, makes code reusable inside functions, and prevents accidental state leakage across subplots.",
-                                "difficulty": "BEGINNER",
-                                "question_type": "CONCEPTUAL"
-                            }
-                        ],
-                        "resources": [
-                            {"title": "Matplotlib Documentation", "url": "https://matplotlib.org/stable/contents.html", "resource_type": "DOCUMENTATION"}
-                        ]
-                    }
-                ]
+                "topics": DATA_HANDLING_TOPICS
             },
             {
                 "area_code": "dsa",
-                "topics": [
-                    {
-                        "slug": "dsa-arrays-lists-and-complexity",
-                        "title": "Arrays, Linked Lists & Asymptotic Complexity",
-                        "summary": "Big-O notation, memory layout, dynamic arrays, singly and doubly linked lists, two pointers, and sliding window.",
-                        "difficulty": "INTERMEDIATE",
-                        "learning_objective": "Analyze algorithmic time and space complexity and implement foundational pointer algorithms.",
-                        "prerequisites": "Python Fundamentals",
-                        "expected_outcome": "Proficiently solve linear data structure interview problems with optimal $O(n)$ time complexity.",
-                        "practice_requirement": "Solve 8 two-pointer and sliding window coding problems.",
-                        "machine_task_relevance": "Provides baseline algorithmic efficiency to avoid timeouts in automated test runners.",
-                        "practical_task_relevance": "Critical for selecting appropriate data structures in production microservices.",
-                        "interview_relevance": "Core technical workout topic tested in all standard engineering screening rounds.",
-                        "subtopics": ["Big-O, Omega, and Theta notations", "Array vs Linked List tradeoffs", "Two-pointer techniques", "Sliding window algorithm", "Fast and slow pointers (cycle detection)"],
-                        "questions": [
-                            {
-                                "question_text": "What is the time complexity difference between deleting the first element of a dynamic array versus a linked list?",
-                                "answer_text": "Deleting the first element of a dynamic array requires shifting all remaining elements left, taking $O(n)$ time. Deleting the first element (head) of a linked list only requires updating the head pointer, taking $O(1)$ time.",
-                                "difficulty": "INTERMEDIATE",
-                                "question_type": "INTERVIEW"
-                            }
-                        ],
-                        "resources": [
-                            {"title": "Visualgo - Data Structure Visualizations", "url": "https://visualgo.net/", "resource_type": "WEBSITE"}
-                        ]
-                    },
-                    {
-                        "slug": "dsa-trees-and-graphs",
-                        "title": "Trees, Binary Search Trees & Graph Traversals",
-                        "summary": "Binary trees, BST properties, tree traversals (inorder, preorder, postorder, level-order), BFS, DFS, and adjacency lists.",
-                        "difficulty": "ADVANCED",
-                        "learning_objective": "Construct non-linear hierarchical data structures and implement graph traversal algorithms.",
-                        "prerequisites": "Recursion, Stacks and Queues",
-                        "expected_outcome": "Implement BFS and DFS from scratch and apply them to shortest path and topological search.",
-                        "practice_requirement": "Implement a Binary Search Tree with search, insertion, and level-order traversal.",
-                        "machine_task_relevance": "Used for parsing syntax trees, dependency graphs, and search spaces.",
-                        "practical_task_relevance": "Foundation for workflow DAGs, social graphs, and hierarchical routing systems.",
-                        "interview_relevance": "Top interview topic in senior engineer screening loops.",
-                        "subtopics": ["Binary Search Tree operations", "Breadth-First Search (BFS)", "Depth-First Search (DFS)", "Graph representations (Adjacency List vs Matrix)", "Shortest path basics"],
-                        "questions": [
-                            {
-                                "question_text": "When would you choose Breadth-First Search (BFS) over Depth-First Search (DFS)?",
-                                "answer_text": "BFS is preferred when searching for the shortest path in unweighted graphs or when the target node is expected to be close to the root. DFS is preferred for exploring full paths, detecting cycles, or topological sorting.",
-                                "difficulty": "ADVANCED",
-                                "question_type": "INTERVIEW"
-                            }
-                        ],
-                        "resources": [
-                            {"title": "Graph Theory and Algorithms", "url": "https://en.wikipedia.org/wiki/Graph_theory", "resource_type": "DOCUMENTATION"}
-                        ]
-                    },
-                    {
-                        "slug": "dsa-searching-and-sorting",
-                        "title": "Searching & Sorting Algorithms",
-                        "summary": "Binary search and variants, Merge Sort, Quick Sort, Timsort mechanics, and stability in sorting.",
-                        "difficulty": "INTERMEDIATE",
-                        "learning_objective": "Master search space reduction and divide-and-conquer sorting mechanics.",
-                        "prerequisites": "Arrays and Asymptotic Complexity",
-                        "expected_outcome": "Implement binary search variants and explain the inner mechanics of divide-and-conquer sorts.",
-                        "practice_requirement": "Implement binary search for rotated sorted arrays and merge sort.",
-                        "machine_task_relevance": "Enables efficient retrieval and ranking algorithms under tight timing constraints.",
-                        "practical_task_relevance": "Underpins database index lookups and sorting pipelines in data processing systems.",
-                        "interview_relevance": "Essential benchmark topic in live coding and machine task assessments.",
-                        "subtopics": ["Binary Search on sorted arrays", "Merge Sort (divide and conquer)", "Quick Sort and pivot selection", "Stability in sorting algorithms", "Search space reduction"],
-                        "questions": [
-                            {
-                                "question_text": "What makes an algorithm a 'stable' sort, and why does stability matter in practical applications?",
-                                "answer_text": "A sort algorithm is stable if it preserves the relative order of elements with equal keys. This is critical when sorting records by multiple criteria sequentially (e.g., sorting by name first, then by date).",
-                                "difficulty": "INTERMEDIATE",
-                                "question_type": "CONCEPTUAL"
-                            }
-                        ],
-                        "resources": [
-                            {"title": "Sorting Algorithms Animations", "url": "https://www.toptal.com/developers/sorting-algorithms", "resource_type": "WEBSITE"}
-                        ]
-                    }
-                ]
+                "topics": DSA_TOPICS
             },
             {
                 "area_code": "statistics",
@@ -1535,16 +1385,21 @@ def test_fetch_rate(mock_get):
                     t.subtopics = top_cfg["subtopics"]
                     db.commit()
 
-                # Default material
-                if not db.query(Material).filter(Material.topic_id == t.id).first():
+                # Material
+                mat = db.query(Material).filter(Material.topic_id == t.id).first()
+                mat_content = top_cfg.get("material") or (f"# {t.title}\n\n**Area:** {target_area.title}\n\n### Key Workout Objectives\n" + "\n".join([f"- {s}" for s in top_cfg["subtopics"]]))
+                if not mat:
                     mat = Material(
                         topic_id=t.id,
-                        title=f"Technical Workout Notes: {t.title}",
-                        content=f"# {t.title}\n\n**Area:** {target_area.title}\n\n### Key Workout Objectives\n" + "\n".join([f"- {s}" for s in top_cfg["subtopics"]]),
+                        title=f"Study Material: {t.title}",
+                        content=mat_content,
                         format="MARKDOWN",
                         author_type="SYSTEM"
                     )
                     db.add(mat)
+                elif top_cfg.get("material"):
+                    mat.title = f"Study Material: {t.title}"
+                    mat.content = top_cfg["material"]
 
                 # Questions
                 for q_spec in top_cfg.get("questions", []):
@@ -1599,17 +1454,23 @@ def test_fetch_rate(mock_get):
             "generators-iterators": "python-advanced-internals-concurrency",
             "probability-fundamentals": "descriptive-stats-and-probability",
             "hypothesis-testing": "hypothesis-testing-and-inference",
-            "arrays-two-pointers": "dsa-arrays-lists-and-complexity",
-            "linked-lists": "dsa-arrays-lists-and-complexity",
+            "arrays-two-pointers": "dsa-week-1-array",
+            "linked-lists": "dsa-week-1-linked-list",
             "variables-and-data-types": "python-setup-and-fundamentals",
             "functions-and-closures": "python-functions-and-scopes",
             "object-oriented-programming": "python-oops-concepts",
             "decorators-and-generators": "python-advanced-internals-concurrency",
-            "arrays-and-strings": "dsa-arrays-lists-and-complexity",
-            "trees-and-graphs": "dsa-trees-and-graphs",
+            "arrays-and-strings": "dsa-week-1-string",
+            "trees-and-graphs": "dsa-week-2-trees-and-binary-search-trees",
+            "dsa-arrays-lists-and-complexity": "dsa-basics",
+            "dsa-trees-and-graphs": "dsa-week-2-trees-and-binary-search-trees",
+            "dsa-searching-and-sorting": "dsa-week-1-linear-and-binary-search",
             "probability-distributions": "descriptive-stats-and-probability",
             "linear-algebra": "linear-algebra-matrices-and-pca",
             "sql-and-query-optimization": "sql-queries-filtering-and-joins",
+            "numpy-vectorization-and-arrays": "numpy-introduction",
+            "pandas-dataframes-and-manipulation": "pandas-introduction",
+            "matplotlib-data-visualization": "matplotlib-introduction",
         }
         for old_slug, new_slug in legacy_topic_mappings.items():
             old_top = db.query(Topic).filter(Topic.slug == old_slug).first()

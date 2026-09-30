@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
+from pydantic import BaseModel
 import os
 import re
 import shutil
@@ -14,6 +15,7 @@ from app.models.entities import (
 )
 from app.schemas.schemas import TaskOut, TaskCreate, TaskProgressUpdate
 from app.services.progression import ProgressionEngine
+from app.services.ai.service import AIService
 from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
@@ -249,6 +251,250 @@ async def upload_machine_task(
         "created_at": task.created_at,
         "module_code": mod.code,
         "learning_area_title": None,
+        "topic_title": None,
+    }
+
+
+class SpecDeconstructRequest(BaseModel):
+    spec_text: str
+    title: Optional[str] = "Machine Task Specification"
+    module_code: Optional[str] = "BM1"
+    custom_instruction: Optional[str] = None
+
+
+class CreateStructuredTaskRequest(BaseModel):
+    title: str
+    module_code: str = "BM1"
+    week_number: int = 1
+    priority: str = "URGENT"
+    learning_area_id: Optional[int] = None
+    overview: Optional[str] = None
+    spec_markdown: str
+    attachment_url: Optional[str] = None
+    attachment_filename: Optional[str] = None
+    create_subtasks: bool = True
+    subtasks: Optional[List[Dict[str, Any]]] = None
+
+
+@router.post("/parse-document")
+async def parse_document(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Parses an uploaded PDF, Word document, text file, or Image (PNG, JPG, WEBP).
+    For images and scanned PDFs, uses Gemini Vision for accurate transcription.
+    Returns the extracted text, suggested title, and file preview details.
+    """
+    original_filename = file.filename or "machine_task_spec"
+    ext = os.path.splitext(original_filename)[1].lower()
+    safe_name = re.sub(r'[^a-zA-Z0-9_\.-]', '_', original_filename)
+    unique_filename = f"user{current_user.id}_{uuid.uuid4().hex[:8]}_{safe_name}"
+    file_path = os.path.join(UPLOAD_DIR, unique_filename)
+
+    file_bytes = await file.read()
+    with open(file_path, "wb") as f:
+        f.write(file_bytes)
+
+    extracted_text = ""
+    suggested_title = os.path.splitext(original_filename)[0].replace("_", " ").replace("-", " ").title()
+    summary = ""
+
+    image_mimes = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+    }
+
+    if ext in image_mimes:
+        # Multimodal OCR with Gemini Vision
+        try:
+            api_key, model_name = AIService.get_user_credentials(db, current_user.id, "gemini")
+            provider = AIService.get_provider("gemini")
+            res = await provider.extract_text_from_media(
+                api_key=api_key,
+                model_name=model_name,
+                media_bytes=file_bytes,
+                mime_type=image_mimes[ext]
+            )
+            extracted_text = res.get("extracted_text", "")
+            suggested_title = res.get("suggested_title", suggested_title)
+            summary = res.get("summary", "")
+        except Exception as e:
+            extracted_text = f"## Attached Image: `{original_filename}`\n\n(AI Vision text extraction requires a Gemini API key configured in Settings -> AI / Gemini. You can review or manually write the requirements below.)"
+    else:
+        # Standard doc parsing (PDF, Word, Text)
+        extracted_text = extract_document_text(file_path, original_filename)
+        # If PDF was scanned image with little text, fallback to Gemini Vision
+        if ext == ".pdf" and len(extracted_text.strip()) < 50:
+            try:
+                api_key, model_name = AIService.get_user_credentials(db, current_user.id, "gemini")
+                provider = AIService.get_provider("gemini")
+                res = await provider.extract_text_from_media(
+                    api_key=api_key,
+                    model_name=model_name,
+                    media_bytes=file_bytes,
+                    mime_type="application/pdf"
+                )
+                if res.get("extracted_text"):
+                    extracted_text = res.get("extracted_text")
+                    suggested_title = res.get("suggested_title", suggested_title)
+                    summary = res.get("summary", "")
+            except Exception:
+                pass
+
+    return {
+        "filename": original_filename,
+        "unique_filename": unique_filename,
+        "file_url": f"/api/v1/tasks/attachments/{unique_filename}",
+        "file_type": ext,
+        "extracted_text": extracted_text,
+        "suggested_title": suggested_title,
+        "summary": summary
+    }
+
+
+@router.post("/deconstruct-spec")
+async def deconstruct_spec(
+    req: SpecDeconstructRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Uses Gemini LLM to deconstruct a machine task specification into:
+    - System Architecture & Component Hierarchy
+    - Explicit Functional & Edge-Case Checklist
+    - Low-Cognitive-Load Phased Weekly Milestones
+    - Recommended sub-tasks
+    """
+    try:
+        api_key, model_name = AIService.get_user_credentials(db, current_user.id, "gemini")
+        provider = AIService.get_provider("gemini")
+        deconstructed = await provider.deconstruct_machine_task(
+            api_key=api_key,
+            model_name=model_name,
+            spec_text=req.spec_text,
+            title=req.title or "Machine Task",
+            module_code=req.module_code or "BM1",
+            custom_instruction=req.custom_instruction
+        )
+        return deconstructed
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI Architectural Deconstruction failed: {str(e)}")
+
+
+@router.post("/create-structured-machine-task", response_model=TaskOut)
+def create_structured_machine_task(
+    req: CreateStructuredTaskRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Creates a master machine task with complete structured markdown specification
+    and creates bite-sized, phased milestone workouts in the candidate's learning area.
+    """
+    mod = db.query(Module).filter(Module.code == req.module_code.upper()).first()
+    if not mod:
+        mod = db.query(Module).filter(Module.code == "BM1").first()
+    if not mod:
+        raise HTTPException(status_code=404, detail="Target module not found")
+
+    ProgressionEngine.enforce_module_unlocked(db, current_user.id, mod.code)
+
+    # Main Machine Task
+    main_task = Task(
+        user_id=current_user.id,
+        module_id=mod.id,
+        learning_area_id=req.learning_area_id,
+        title=req.title,
+        description=req.overview or f"Structured machine task for Week {req.week_number}",
+        task_type="MACHINE_TASK",
+        priority=req.priority.upper(),
+        is_required=True,
+        attachment_url=req.attachment_url,
+        attachment_filename=req.attachment_filename,
+        week_number=req.week_number,
+        spec_markdown=req.spec_markdown,
+    )
+    db.add(main_task)
+    db.flush()
+
+    # User task progress for main task
+    tkp = UserTaskProgress(
+        user_id=current_user.id,
+        task_id=main_task.id,
+        status="TODO"
+    )
+    db.add(tkp)
+
+    # Create phased subtasks if requested
+    if req.create_subtasks and req.subtasks:
+        for idx, sub in enumerate(req.subtasks):
+            sub_title = sub.get("title", f"Phase {idx+1}")
+            sub_desc = sub.get("description", "")
+            sub_priority = sub.get("priority", "HIGH").upper()
+            sub_type = sub.get("task_type", "CODING").upper()
+            sub_task = Task(
+                user_id=current_user.id,
+                module_id=mod.id,
+                learning_area_id=req.learning_area_id,
+                title=f"[{req.title[:24]}] {sub_title}",
+                description=sub_desc,
+                task_type=sub_type,
+                priority=sub_priority,
+                is_required=True,
+                week_number=req.week_number,
+                spec_markdown=f"### Parent Task: {req.title}\n\n**Milestone Objective:**\n{sub_desc}",
+            )
+            db.add(sub_task)
+            db.flush()
+            sub_progress = UserTaskProgress(
+                user_id=current_user.id,
+                task_id=sub_task.id,
+                status="TODO"
+            )
+            db.add(sub_progress)
+
+    # Log activity
+    act = ActivityLog(
+        user_id=current_user.id,
+        action_type="TASK_UPLOADED",
+        description=f"Created Structured Machine Task: {main_task.title}",
+        metadata_json={
+            "task_id": main_task.id,
+            "filename": req.attachment_filename,
+            "week_number": req.week_number,
+            "subtasks_count": len(req.subtasks) if req.subtasks else 0
+        }
+    )
+    db.add(act)
+    db.commit()
+    db.refresh(main_task)
+
+    area = db.query(LearningArea).filter(LearningArea.id == main_task.learning_area_id).first() if main_task.learning_area_id else None
+    return {
+        "id": main_task.id,
+        "user_id": main_task.user_id,
+        "module_id": main_task.module_id,
+        "learning_area_id": main_task.learning_area_id,
+        "topic_id": main_task.topic_id,
+        "title": main_task.title,
+        "description": main_task.description,
+        "task_type": main_task.task_type,
+        "priority": main_task.priority,
+        "due_date": main_task.due_date,
+        "is_required": main_task.is_required,
+        "user_status": "TODO",
+        "notes": None,
+        "attachment_url": main_task.attachment_url,
+        "attachment_filename": main_task.attachment_filename,
+        "week_number": main_task.week_number,
+        "spec_markdown": main_task.spec_markdown,
+        "created_at": main_task.created_at,
+        "module_code": mod.code,
+        "learning_area_title": area.title if area else None,
         "topic_title": None,
     }
 
