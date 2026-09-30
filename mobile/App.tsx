@@ -35,6 +35,7 @@ import { SafeAreaView, SafeAreaProvider, useSafeAreaInsets } from 'react-native-
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
 import { MobileApi, MobileTopicSummary, MobileTopicDetail, MobileUser } from './src/services/api';
 import { DashboardOverview, Task, LearningAreaProgress, AnalyticsOverview } from './src/types';
+import { AuthScreen } from './src/screens/AuthScreen';
 
 const logoDark = require('./assets/logo-dark.png');
 const logoLight = require('./assets/logo-light.png');
@@ -45,6 +46,7 @@ function MainScreen() {
   const [currentUser, setCurrentUser] = useState<MobileUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   // Bottom navigation tabs: Home | Learn | Tasks | TOI | Progress
   const [activeTab, setActiveTab] = useState<'Home' | 'Learn' | 'Tasks' | 'TOI' | 'Progress'>('Home');
@@ -263,21 +265,38 @@ function MainScreen() {
 
   const loadDashboard = async () => {
     try {
-      const me = await MobileApi.getMe().catch(() => null);
+      const { user: savedUser } = await MobileApi.initLocalStorage();
+      if (savedUser && !currentUser) {
+        setCurrentUser(savedUser);
+      }
+
+      let me = await MobileApi.getMe().catch(() => null);
       if (!me) {
-        const loginRes = await MobileApi.login('user1', 'password123');
-        setCurrentUser(loginRes.user);
+        if (!savedUser) {
+          const loginRes = await MobileApi.login('user1', 'password123').catch(() => null);
+          if (loginRes) {
+            me = loginRes.user;
+            setCurrentUser(loginRes.user);
+          }
+        }
       } else {
         setCurrentUser(me);
       }
 
       const [dash, tasks, an] = await Promise.all([
-        MobileApi.getDashboard(),
+        MobileApi.getDashboard().catch(() => null),
         MobileApi.getAllTasks().catch(() => []),
         MobileApi.getAnalytics(pacingDays).catch(() => null),
       ]);
-      setData(dash);
-      setAllTasksList(tasks);
+
+      // Hydrate local progress map onto tasks list so completed tasks stay completed across app restart/update
+      const mergedTasks = tasks.map((t: Task) => {
+        const localStatus = MobileApi.getLocalProgress('task', t.id);
+        return localStatus ? { ...t, user_status: localStatus as any } : t;
+      });
+
+      if (dash) setData(dash);
+      setAllTasksList(mergedTasks);
       if (an) setAnalyticsData(an);
     } catch (e: any) {
       console.error('Error loading mobile data:', e);
@@ -290,6 +309,14 @@ function MainScreen() {
   useEffect(() => {
     loadDashboard();
   }, []);
+
+  const handleSignOut = async () => {
+    await MobileApi.logout();
+    setCurrentUser(null);
+    setData(null);
+    setProfileModalVisible(false);
+    setShowAuthModal(true);
+  };
 
   // Quick switch between demo users
   const handleQuickSwitchUser = async (username: string) => {
@@ -408,33 +435,41 @@ function MainScreen() {
 
   const handleToggleTopicStatus = async (topicId: number, currentStatus: string) => {
     const nextStatus = currentStatus === 'COMPLETED' ? 'NOT_STARTED' : 'COMPLETED';
+    await MobileApi.saveLocalProgress('topic', topicId, nextStatus);
+    if (selectedTopic && selectedTopic.id === topicId) {
+      setSelectedTopic({ ...selectedTopic, user_status: nextStatus });
+    }
     try {
       await MobileApi.updateTopicProgress(topicId, nextStatus);
       if (selectedArea) {
         const tops = await MobileApi.getAreaTopics(selectedArea.id);
         setAreaTopics(tops);
       }
-      if (selectedTopic && selectedTopic.id === topicId) {
-        setSelectedTopic({ ...selectedTopic, user_status: nextStatus });
-      }
       loadDashboard();
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      console.warn('Backend sync failed, saved in local storage:', e.message);
     }
   };
 
   const handleToggleTaskStatus = async (task: Task) => {
     const nextStatus = task.user_status === 'COMPLETED' ? 'TODO' : 'COMPLETED';
+    // 1. Immediately persist to AsyncStorage so state survives offline, app restart, or app update
+    await MobileApi.saveLocalProgress('task', task.id, nextStatus);
+
+    // 2. Optimistic local UI update
+    if (focusedTask && focusedTask.id === task.id) {
+      setFocusedTask({ ...focusedTask, user_status: nextStatus });
+    }
+    setAllTasksList((prev) =>
+      prev.map((t) => (t.id === task.id ? { ...t, user_status: nextStatus } : t))
+    );
+
+    // 3. Remote sync
     try {
       await MobileApi.updateTaskProgress(task.id, nextStatus);
-      if (focusedTask && focusedTask.id === task.id) {
-        setFocusedTask({ ...focusedTask, user_status: nextStatus });
-      }
-      const updatedList = await MobileApi.getAllTasks();
-      setAllTasksList(updatedList);
       loadDashboard();
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      console.warn('Backend sync failed, saved in local storage:', e.message);
     }
   };
 
@@ -451,6 +486,35 @@ function MainScreen() {
       setActiveTab('Learn');
     }
   };
+
+  if (showAuthModal) {
+    return (
+      <AuthScreen
+        theme={theme}
+        onToggleTheme={() => setTheme(isDark ? 'light' : 'dark')}
+        onAuthSuccess={(u) => {
+          setCurrentUser(u);
+          setShowAuthModal(false);
+          loadDashboard();
+        }}
+        onCancel={() => setShowAuthModal(false)}
+      />
+    );
+  }
+
+  if (!currentUser && !loading) {
+    return (
+      <AuthScreen
+        theme={theme}
+        onToggleTheme={() => setTheme(isDark ? 'light' : 'dark')}
+        onAuthSuccess={(u) => {
+          setCurrentUser(u);
+          setShowAuthModal(false);
+          loadDashboard();
+        }}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -476,6 +540,9 @@ function MainScreen() {
           <Text style={styles.errorDesc}>{error}</Text>
           <TouchableOpacity onPress={loadDashboard} style={styles.retryButton}>
             <Text style={styles.retryText}>Retry Connection</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setShowAuthModal(true)} style={[styles.retryButton, { marginTop: 10, backgroundColor: '#202422' }]}>
+            <Text style={styles.retryText}>Switch Account / Dev Mode</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>

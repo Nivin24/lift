@@ -35,6 +35,12 @@ export interface MobileUser {
   username: string;
   email: string;
   full_name?: string;
+  selected_domain?: string;
+  experience_level?: string;
+  primary_goal?: string;
+  daily_commitment_hours?: number;
+  target_completion_date?: string;
+  onboarding_completed?: boolean;
 }
 
 export interface MobileAISettings {
@@ -57,16 +63,84 @@ const getBaseUrl = (): string => {
 const API_BASE = getBaseUrl();
 console.log('[LIFT Mobile] Backend URL:', API_BASE);
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const TOKEN_KEY = '@lift_mobile_auth_token';
+const USER_KEY = '@lift_mobile_user';
+const PROGRESS_KEY = '@lift_mobile_local_progress';
+
 export class MobileApi {
   private static token: string | null = null;
   private static currentUser: MobileUser | null = null;
+  private static localProgressMap: Record<string, string> = {};
 
-  static setToken(token: string | null) {
+  static async initLocalStorage(): Promise<{ token: string | null; user: MobileUser | null }> {
+    try {
+      const [savedToken, savedUser, savedProgress] = await Promise.all([
+        AsyncStorage.getItem(TOKEN_KEY),
+        AsyncStorage.getItem(USER_KEY),
+        AsyncStorage.getItem(PROGRESS_KEY),
+      ]);
+      if (savedToken) {
+        this.token = savedToken;
+      }
+      if (savedUser) {
+        this.currentUser = JSON.parse(savedUser);
+      }
+      if (savedProgress) {
+        this.localProgressMap = JSON.parse(savedProgress);
+      }
+      return { token: this.token, user: this.currentUser };
+    } catch (e) {
+      console.warn('[LIFT Mobile] Failed to read from local storage:', e);
+      return { token: null, user: null };
+    }
+  }
+
+  static async setToken(token: string | null) {
     this.token = token;
+    if (token) {
+      await AsyncStorage.setItem(TOKEN_KEY, token);
+    } else {
+      await AsyncStorage.removeItem(TOKEN_KEY);
+    }
+  }
+
+  static async setCurrentUser(user: MobileUser | null) {
+    this.currentUser = user;
+    if (user) {
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
+    } else {
+      await AsyncStorage.removeItem(USER_KEY);
+    }
   }
 
   static getCurrentUser(): MobileUser | null {
     return this.currentUser;
+  }
+
+  static getLocalProgress(type: 'task' | 'topic', id: number): string | undefined {
+    return this.localProgressMap[`${type}_${id}`];
+  }
+
+  static async saveLocalProgress(type: 'task' | 'topic', id: number, status: string) {
+    try {
+      this.localProgressMap[`${type}_${id}`] = status;
+      await AsyncStorage.setItem(PROGRESS_KEY, JSON.stringify(this.localProgressMap));
+    } catch (e) {
+      console.warn('[LIFT Mobile] Failed to save local progress:', e);
+    }
+  }
+
+  static async logout() {
+    this.token = null;
+    this.currentUser = null;
+    try {
+      await Promise.all([
+        AsyncStorage.removeItem(TOKEN_KEY),
+        AsyncStorage.removeItem(USER_KEY),
+      ]);
+    } catch (e) {}
   }
 
   static async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -98,14 +172,14 @@ export class MobileApi {
       method: 'POST',
       body: JSON.stringify({ username_or_email: usernameOrEmail.trim(), password }),
     });
-    this.token = res.access_token;
-    this.currentUser = res.user;
+    await this.setToken(res.access_token);
+    await this.setCurrentUser(res.user);
     return res;
   }
 
-  static async register(email: string, password: string, fullName?: string) {
+  static async register(email: string, password: string, fullName?: string, customUsername?: string) {
     const cleanEmail = email.trim();
-    const cleanUsername = cleanEmail.includes('@') ? cleanEmail.split('@')[0] : cleanEmail;
+    const cleanUsername = (customUsername || (cleanEmail.includes('@') ? cleanEmail.split('@')[0] : cleanEmail)).trim();
     const res = await this.request<{ access_token: string; user: MobileUser }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify({
@@ -115,9 +189,38 @@ export class MobileApi {
         full_name: fullName || cleanUsername,
       }),
     });
-    this.token = res.access_token;
-    this.currentUser = res.user;
+    await this.setToken(res.access_token);
+    await this.setCurrentUser(res.user);
     return res;
+  }
+
+  static async forgotPassword(usernameOrEmail: string) {
+    return this.request<{ message: string; user_exists: boolean; username?: string; email?: string }>(
+      '/auth/forgot-password',
+      {
+        method: 'POST',
+        body: JSON.stringify({ username_or_email: usernameOrEmail.trim() }),
+      }
+    );
+  }
+
+  static async resetPassword(usernameOrEmail: string, newPassword: string) {
+    const res = await this.request<{ access_token: string; user: MobileUser }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ username_or_email: usernameOrEmail.trim(), new_password: newPassword }),
+    });
+    await this.setToken(res.access_token);
+    await this.setCurrentUser(res.user);
+    return res;
+  }
+
+  static async updateOnboarding(data: Partial<MobileUser>): Promise<MobileUser> {
+    const updated = await this.request<MobileUser>('/auth/onboarding', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    await this.setCurrentUser(updated);
+    return updated;
   }
 
   static async loginOrRegister(email: string, password: string, isRegisterMode: boolean = false) {
@@ -137,7 +240,7 @@ export class MobileApi {
 
   static async getMe(): Promise<MobileUser> {
     const user = await this.request<MobileUser>('/auth/me');
-    this.currentUser = user;
+    await this.setCurrentUser(user);
     return user;
   }
 
