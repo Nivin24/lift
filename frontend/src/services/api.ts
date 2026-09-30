@@ -69,12 +69,58 @@ class ApiService {
     return data;
   }
 
+  async forgotPassword(username_or_email: string): Promise<{ message: string; user_exists: boolean; username?: string; email?: string }> {
+    return this.request('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ username_or_email }),
+    });
+  }
+
+  async resetPassword(username_or_email: string, new_password: string): Promise<{ access_token: string; user: User }> {
+    const data = await this.request<{ access_token: string; user: User }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ username_or_email, new_password }),
+    });
+    this.setToken(data.access_token);
+    return data;
+  }
+
   async getMe(): Promise<User> {
     return this.request<User>('/auth/me');
   }
 
   logout() {
     this.setToken(null);
+    localStorage.removeItem('lift_current_user');
+  }
+
+  async updateOnboarding(data: Partial<import('../types').StudentOnboardingData>): Promise<User> {
+    const updatedUser = await this.request<User>('/auth/onboarding', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    localStorage.setItem('lift_current_user', JSON.stringify(updatedUser));
+    return updatedUser;
+  }
+
+  // Local Storage Progress Persistence & Offline Hydration
+  getLocalProgressMap(): Record<string, string> {
+    try {
+      const saved = localStorage.getItem('lift_local_progress');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  saveLocalProgress(type: 'task' | 'topic', id: number, status: string) {
+    try {
+      const map = this.getLocalProgressMap();
+      map[`${type}_${id}`] = status;
+      localStorage.setItem('lift_local_progress', JSON.stringify(map));
+    } catch (e) {
+      console.warn('Failed to save to local storage', e);
+    }
   }
 
   // Dashboard & Progress
@@ -83,6 +129,7 @@ class ApiService {
   }
 
   async updateTopicProgress(topicId: number, status: string, notes?: string): Promise<any> {
+    this.saveLocalProgress('topic', topicId, status);
     return this.request(`/progress/topics/${topicId}`, {
       method: 'POST',
       body: JSON.stringify({ status, notes }),
@@ -90,6 +137,7 @@ class ApiService {
   }
 
   async updateTaskProgress(taskId: number, status: string, notes?: string): Promise<Task> {
+    this.saveLocalProgress('task', taskId, status);
     return this.request<Task>(`/tasks/${taskId}/progress`, {
       method: 'POST',
       body: JSON.stringify({ status, notes }),

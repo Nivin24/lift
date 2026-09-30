@@ -5,7 +5,23 @@ export interface User {
   full_name?: string;
   is_active: boolean;
   created_at: string;
+  selected_domain?: string;
+  experience_level?: string;
+  primary_goal?: string;
+  daily_commitment_hours?: number;
+  target_completion_date?: string;
+  onboarding_completed?: boolean;
 }
+
+export interface StudentOnboardingData {
+  selected_domain: string;
+  experience_level: string;
+  primary_goal: string;
+  daily_commitment_hours: number;
+  target_completion_date?: string;
+  onboarding_completed: boolean;
+}
+
 
 export interface ModuleStatus {
   module_id: number;

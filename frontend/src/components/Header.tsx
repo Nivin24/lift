@@ -11,6 +11,9 @@ import {
   ChevronDown,
   Search,
   Command,
+  KeyRound,
+  LogOut,
+  Compass,
 } from 'lucide-react';
 import { AISettings } from '../types';
 
@@ -32,7 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
   onRefresh,
   onOpenSettings,
 }) => {
-  const { user, switchDemoUser } = useAuth();
+  const { user, switchDemoUser, logout, openAuthModal } = useAuth();
   const { theme, toggleTheme, logoTheme, setLogoTheme, activeLogo } = useTheme();
   const [switching, setSwitching] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -254,7 +257,29 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
               </div>
 
-              <div className="pt-1 border-t border-[#F0F1EC] dark:border-[#262A27]">
+              <div className="pt-1 border-t border-[#F0F1EC] dark:border-[#262A27] space-y-0.5">
+                <button
+                  onClick={() => {
+                    openAuthModal('signin');
+                    setIsDropdownOpen(false);
+                  }}
+                  className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-xl text-xs font-medium text-[#161917] dark:text-white hover:bg-[#F0F1EC] dark:hover:bg-[#222624] transition-colors"
+                >
+                  <KeyRound className="w-3.5 h-3.5 text-[#888F89]" />
+                  <span>Account & Passwords</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setCurrentTab('onboarding');
+                    setIsDropdownOpen(false);
+                  }}
+                  className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-xl text-xs font-medium text-[#161917] dark:text-white hover:bg-[#F0F1EC] dark:hover:bg-[#222624] transition-colors"
+                >
+                  <Compass className="w-3.5 h-3.5 text-[#888F89]" />
+                  <span>Curriculum & Domain Track</span>
+                </button>
+
                 <button
                   onClick={() => {
                     onOpenSettings();
@@ -264,6 +289,18 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   <Settings className="w-3.5 h-3.5 text-[#888F89]" />
                   <span>Settings & BYOK</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    logout();
+                    openAuthModal('signin');
+                    setIsDropdownOpen(false);
+                  }}
+                  className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-xl text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5 text-rose-500" />
+                  <span>Sign Out</span>
                 </button>
               </div>
             </div>

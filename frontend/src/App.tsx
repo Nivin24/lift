@@ -14,6 +14,10 @@ import { TasksView } from './pages/TasksView';
 import { SettingsView } from './pages/SettingsView';
 import { AreasOverview } from './pages/AreasOverview';
 import { AnalyticsView } from './pages/AnalyticsView';
+import { AuthModal } from './components/AuthModal';
+
+import { AuthPage } from './pages/AuthPage';
+import { OnboardingView } from './pages/OnboardingView';
 
 const LiftApp: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
@@ -29,7 +33,10 @@ const LiftApp: React.FC = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(true); // Default to slim floating dock like reference image
 
   const fetchGlobalData = async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     try {
       const [dash, ai] = await Promise.all([
         api.getDashboard(),
@@ -47,6 +54,9 @@ const LiftApp: React.FC = () => {
   useEffect(() => {
     if (user) {
       fetchGlobalData();
+    } else {
+      setLoading(false);
+      setDashboardData(null);
     }
   }, [user?.id]);
 
@@ -73,13 +83,41 @@ const LiftApp: React.FC = () => {
     setCurrentTab('tasks');
   };
 
-  if (authLoading || (loading && !dashboardData)) {
+  if (authLoading) {
     return (
-      <div className="min-h-screen bg-workspace-bg flex flex-col items-center justify-center space-y-4">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-cyan-400 flex items-center justify-center font-mono font-bold text-white text-xl animate-pulse">
+      <div className="min-h-screen bg-[#F0F1EC] dark:bg-[#0B0D0C] flex flex-col items-center justify-center space-y-4">
+        <div className="w-10 h-10 rounded-xl bg-[#161917] dark:bg-[#202422] border border-[#D5D8D0] dark:border-[#2E3330] flex items-center justify-center font-mono font-bold text-[#9DE8BA] text-xl shadow-sm">
           ▲
         </div>
-        <p className="font-mono text-xs text-slate-400 tracking-wider">INITIALIZING LIFT WORKSPACE...</p>
+        <p className="font-mono text-xs text-[#70746E] dark:text-[#888F89] tracking-wider">INITIALIZING LIFT WORKSPACE...</p>
+      </div>
+    );
+  }
+
+  // If user is not authenticated or explicitly viewing auth, show the dedicated AuthPage
+  if (!user || currentTab === 'auth') {
+    return <AuthPage onSkipToDev={() => setCurrentTab('dashboard')} />;
+  }
+
+  // If student has not yet completed onboarding or explicitly opens onboarding
+  if (user && (user.onboarding_completed === false || currentTab === 'onboarding')) {
+    return (
+      <OnboardingView
+        onComplete={() => {
+          setCurrentTab('dashboard');
+          fetchGlobalData();
+        }}
+      />
+    );
+  }
+
+  if (loading && !dashboardData) {
+    return (
+      <div className="min-h-screen bg-[#F0F1EC] dark:bg-[#0B0D0C] flex flex-col items-center justify-center space-y-4">
+        <div className="w-10 h-10 rounded-xl bg-[#161917] dark:bg-[#202422] border border-[#D5D8D0] dark:border-[#2E3330] flex items-center justify-center font-mono font-bold text-[#9DE8BA] text-xl shadow-sm">
+          ▲
+        </div>
+        <p className="font-mono text-xs text-[#70746E] dark:text-[#888F89] tracking-wider">CONNECTING TO LIFT ENGINE...</p>
       </div>
     );
   }
@@ -193,6 +231,9 @@ const LiftApp: React.FC = () => {
         modules={dashboardData?.modules || []}
         onSelectModule={handleSelectModule}
       />
+
+      {/* Global Matching Authentication Modal */}
+      <AuthModal />
     </div>
   );
 };
