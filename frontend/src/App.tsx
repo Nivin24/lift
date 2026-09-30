@@ -174,7 +174,10 @@ const LiftApp: React.FC = () => {
           )}
 
           {currentTab === 'tasks' && (
-            <TasksView onSelectTopic={handleSelectTopic} />
+            <TasksView
+              onSelectTopic={handleSelectTopic}
+              onBackToDashboard={() => setCurrentTab('dashboard')}
+            />
           )}
 
           {currentTab === 'settings' && (

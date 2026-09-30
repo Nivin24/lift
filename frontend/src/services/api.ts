@@ -188,6 +188,71 @@ class ApiService {
   async getAnalytics(pacingDays: number = 7): Promise<AnalyticsOverview> {
     return this.request<AnalyticsOverview>(`/progress/analytics?pacing_days=${pacingDays}`);
   }
+
+  // Machine Task Specification Parsing & AI Deconstruction
+  async parseDocument(file: File): Promise<{
+    filename: string;
+    unique_filename: string;
+    file_url: string;
+    file_type: string;
+    extracted_text: string;
+    suggested_title: string;
+    summary: string;
+  }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = this.getToken();
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const response = await fetch(`${API_BASE}/tasks/parse-document`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: 'Failed to parse document' }));
+      throw new Error(err.detail || 'Failed to parse document');
+    }
+    return response.json();
+  }
+
+  async deconstructSpec(
+    specText: string,
+    title?: string,
+    moduleCode: string = 'BM1',
+    customInstruction?: string
+  ): Promise<any> {
+    return this.request('/tasks/deconstruct-spec', {
+      method: 'POST',
+      body: JSON.stringify({
+        spec_text: specText,
+        title: title || 'Machine Task',
+        module_code: moduleCode,
+        custom_instruction: customInstruction,
+      }),
+    });
+  }
+
+  async createStructuredMachineTask(payload: {
+    title: string;
+    module_code?: string;
+    week_number?: number;
+    priority?: string;
+    learning_area_id?: number;
+    overview?: string;
+    spec_markdown: string;
+    attachment_url?: string;
+    attachment_filename?: string;
+    create_subtasks?: boolean;
+    subtasks?: any[];
+  }): Promise<Task> {
+    return this.request<Task>('/tasks/create-structured-machine-task', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
 }
 
 export const api = new ApiService();
