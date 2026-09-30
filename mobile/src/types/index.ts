@@ -42,7 +42,9 @@ export interface Task {
   id: number;
   module_id: number;
   learning_area_id?: number;
+  learning_area_title?: string;
   topic_id?: number;
+  topic_title?: string;
   title: string;
   description?: string;
   task_type: string;

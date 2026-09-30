@@ -32,6 +32,7 @@ import {
   CloseIcon,
 } from './src/components/VectorIcons';
 import { SafeAreaView, SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
 import { MobileApi, MobileTopicSummary, MobileTopicDetail, MobileUser } from './src/services/api';
 import { DashboardOverview, Task, LearningAreaProgress, AnalyticsOverview } from './src/types';
 
@@ -60,6 +61,8 @@ function MainScreen() {
   // Tasks Focus State
   const [focusedTask, setFocusedTask] = useState<Task | null>(null);
   const [taskFilter, setTaskFilter] = useState<'ALL' | 'TODO' | 'COMPLETED'>('ALL');
+  const [selectedTaskArea, setSelectedTaskArea] = useState<string>('ALL');
+  const [collapsedTaskAreas, setCollapsedTaskAreas] = useState<Record<string, boolean>>({});
   const [allTasksList, setAllTasksList] = useState<Task[]>([]);
   const [focusedTaskQuestions, setFocusedTaskQuestions] = useState<Array<{ id: number; question_text: string; answer_text?: string; question_type: string; difficulty: string }>>([]);
 
@@ -88,20 +91,76 @@ function MainScreen() {
   // Syllabus checklist state for topic detail
   const [checkedSubtopics, setCheckedSubtopics] = useState<Record<string, boolean>>({});
 
-  // Collapsible Bottom Menu Bar with Micro-Animation
-  const [isMenuExpanded, setIsMenuExpanded] = useState(true);
-  const menuAnim = useRef(new Animated.Value(1)).current; // 0 = collapsed circle, 1 = expanded dock
+  // Collapsible Bottom Menu Bar with Micro-Animation (Starts collapsed as circular orb!)
+  const [isMenuExpanded, setIsMenuExpanded] = useState(false);
+  const isMenuExpandedRef = useRef(false);
+  const autoCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastExpandedAtRef = useRef<number>(0);
+
+  useEffect(() => {
+    isMenuExpandedRef.current = isMenuExpanded;
+  }, [isMenuExpanded]);
+
+  const menuAnim = useRef(new Animated.Value(0)).current; // 0 = collapsed circle, 1 = expanded dock
   const hubAnim = useRef(new Animated.Value(0)).current; // Quick hub modal entrance
 
-  const toggleMenuExpansion = (expand?: boolean) => {
-    const target = expand !== undefined ? expand : !isMenuExpanded;
-    setIsMenuExpanded(target);
+  const clearAutoCollapseTimer = () => {
+    if (autoCollapseTimerRef.current) {
+      clearTimeout(autoCollapseTimerRef.current);
+      autoCollapseTimerRef.current = null;
+    }
+  };
+
+  const startAutoCollapseTimer = (seconds: number = 3.5) => {
+    clearAutoCollapseTimer();
+    autoCollapseTimerRef.current = setTimeout(() => {
+      collapseMenu();
+    }, seconds * 1000);
+  };
+
+  const expandMenu = (staySeconds: number = 3.5) => {
+    lastExpandedAtRef.current = Date.now();
+    clearAutoCollapseTimer();
+    setIsMenuExpanded(true);
     Animated.spring(menuAnim, {
-      toValue: target ? 1 : 0,
+      toValue: 1,
+      friction: 7.5,
+      tension: 50,
+      useNativeDriver: false,
+    }).start();
+
+    if (staySeconds > 0) {
+      startAutoCollapseTimer(staySeconds);
+    }
+  };
+
+  const collapseMenu = () => {
+    clearAutoCollapseTimer();
+    setIsMenuExpanded(false);
+    Animated.spring(menuAnim, {
+      toValue: 0,
       friction: 8,
       tension: 45,
       useNativeDriver: false,
     }).start();
+  };
+
+  const toggleMenuExpansion = (expand?: boolean) => {
+    const target = expand !== undefined ? expand : !isMenuExpanded;
+    if (target) {
+      expandMenu(3.5);
+    } else {
+      collapseMenu();
+    }
+  };
+
+  const handleSelectNavTab = (tab: 'Learn' | 'Tasks' | 'Home' | 'TOI' | 'Progress') => {
+    clearAutoCollapseTimer();
+    setSelectedArea(null);
+    setSelectedTopic(null);
+    setFocusedTask(null);
+    setActiveTab(tab);
+    collapseMenu();
   };
 
   useEffect(() => {
@@ -154,17 +213,20 @@ function MainScreen() {
   const bottomBarPanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dx) > 6,
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dx) > 12,
       onStartShouldSetPanResponderCapture: () => false,
-      onMoveShouldSetPanResponderCapture: (_, gestureState) => Math.abs(gestureState.dx) > 6,
+      onMoveShouldSetPanResponderCapture: (_, gestureState) => Math.abs(gestureState.dx) > 12,
       onPanResponderGrant: (evt) => {
+        clearAutoCollapseTimer();
         handleDragToTab(evt.nativeEvent.pageX);
       },
       onPanResponderMove: (evt) => {
+        clearAutoCollapseTimer();
         handleDragToTab(evt.nativeEvent.pageX);
       },
       onPanResponderRelease: (evt) => {
         handleDragToTab(evt.nativeEvent.pageX);
+        startAutoCollapseTimer(3.5);
       },
     })
   ).current;
@@ -428,7 +490,34 @@ function MainScreen() {
   const bottomBarHeight = 56 + bottomBarPadding;
 
   const tasksToDisplay = allTasksList.length > 0 ? allTasksList : data?.pending_tasks || [];
+
+  const taskAreaList: string[] = (() => {
+    const areas = new Set<string>();
+    tasksToDisplay.forEach((t) => {
+      if (t.learning_area_title) areas.add(t.learning_area_title);
+    });
+    const canonicalOrder = [
+      'Python',
+      'Data Handling & Visualization',
+      'Data Structures & Algorithms',
+      'Mathematics & Statistics',
+      'Machine Learning Concepts',
+      'SQL for Data & ML',
+      'Live Project & Presentation',
+    ];
+    return Array.from(areas).sort((a, b) => {
+      const idxA = canonicalOrder.indexOf(a);
+      const idxB = canonicalOrder.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b);
+    });
+  })();
+
   const filteredTasks = tasksToDisplay.filter((t) => {
+    const matchesArea = selectedTaskArea === 'ALL' || t.learning_area_title === selectedTaskArea;
+    if (!matchesArea) return false;
     const matchesFilter = taskFilter === 'ALL' || t.user_status === taskFilter;
     if (!matchesFilter) return false;
     if (searchQuery.trim().length === 0) return true;
@@ -436,122 +525,84 @@ function MainScreen() {
     return (
       t.title.toLowerCase().includes(q) ||
       (t.description || '').toLowerCase().includes(q) ||
+      (t.learning_area_title || '').toLowerCase().includes(q) ||
       (t.module_code || '').toLowerCase().includes(q) ||
       (t.task_type || '').toLowerCase().includes(q)
     );
   });
 
+  const groupedTasksByArea: Map<string, Task[]> = (() => {
+    const map = new Map<string, Task[]>();
+    const priorityScore: Record<string, number> = {
+      URGENT: 4,
+      HIGH: 3,
+      MEDIUM: 2,
+      LOW: 1,
+    };
+
+    filteredTasks.forEach((task) => {
+      const area = task.learning_area_title || 'General Tasks';
+      if (!map.has(area)) {
+        map.set(area, []);
+      }
+      map.get(area)!.push(task);
+    });
+
+    map.forEach((list) => {
+      list.sort((a, b) => {
+        if (a.user_status === 'COMPLETED' && b.user_status !== 'COMPLETED') return 1;
+        if (a.user_status !== 'COMPLETED' && b.user_status === 'COMPLETED') return -1;
+        const pA = priorityScore[a.priority] || 0;
+        const pB = priorityScore[b.priority] || 0;
+        if (pB !== pA) return pB - pA;
+        return (a.topic_id || a.id) - (b.topic_id || b.id);
+      });
+    });
+
+    return map;
+  })();
+
   // User initials for the circular avatar
   const userInitial = (currentUser?.full_name || currentUser?.username || 'U').charAt(0).toUpperCase();
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#0B0D0C' : '#F0F1EC' }]} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#0B0D0C' : '#F0F1EC' }]} edges={['left', 'right']}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      {/* 1. TOP FLOATING ISLAND NAVIGATION */}
-      <View
-        style={[
-          styles.topIsland,
-          {
-            backgroundColor: isDark ? '#161917' : '#FFFFFF',
-            borderColor: isDark ? '#262A27' : '#D8DBD2',
-            shadowColor: isDark ? '#000000' : '#161917',
-            shadowOpacity: isDark ? 0.35 : 0.09,
-          },
-        ]}
-      >
-        <View style={styles.topIslandRow}>
-          {/* Brand & Stage cluster */}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => {
-              setSelectedArea(null);
-              setSelectedTopic(null);
-              setFocusedTask(null);
-              setActiveTab('Home');
-            }}
-            style={styles.topBrandCluster}
-          >
-            <Image
-              source={activeLogo}
-              style={styles.topBrandLogoImage}
-              resizeMode="contain"
-            />
-            <View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={[styles.topBrandName, { color: isDark ? '#FFFFFF' : '#161917' }]}>LIFT</Text>
-                <View style={[styles.topStageBadge, { backgroundColor: isDark ? '#202422' : '#F0F1EC', borderColor: isDark ? '#2E3330' : '#E2E3DC' }]}>
-                  <View style={styles.topStageDot} />
-                  <Text style={[styles.topStageText, { color: isDark ? '#9DE8BA' : '#161917' }]}>BM1</Text>
-                </View>
-              </View>
-            </View>
-          </TouchableOpacity>
-
-          {/* Action cluster: Search | Theme Toggle | Profile */}
-          <View style={styles.topActionCluster}>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setSearchOpen(!searchOpen)}
-              style={[styles.topIconBtn, { backgroundColor: searchOpen ? (isDark ? '#2E3330' : '#E0E3DA') : (isDark ? '#202422' : '#EFF1EA'), borderColor: isDark ? '#2E3330' : '#D8DBD2' }]}
-            >
-              <SearchIcon size={16} color={isDark ? '#FFFFFF' : '#161917'} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setTheme(isDark ? 'light' : 'dark')}
-              style={[styles.topIconBtn, { backgroundColor: isDark ? '#202422' : '#EFF1EA', borderColor: isDark ? '#2E3330' : '#D8DBD2' }]}
-            >
-              {isDark ? <MoonIcon size={16} color="#FCE8A6" /> : <SunIcon size={16} color="#D97706" />}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setProfileModalVisible(true)}
-              style={styles.profileCircleBtn}
-            >
-              <View style={[styles.profileCircleInner, { backgroundColor: isDark ? '#262A27' : '#161917', borderColor: isDark ? '#363C38' : '#FFFFFF', borderWidth: 1 }]}>
-                <Text style={styles.profileInitialText}>{userInitial}</Text>
-              </View>
-              <View style={styles.activeDot} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Collapsible Search Input inside the island */}
-        {searchOpen && (
-          <View style={[styles.topSearchBox, { borderTopColor: isDark ? '#262A27' : '#E2E3DC' }]}>
-            <TextInput
-              placeholder="Filter topics, tasks, workouts..."
-              placeholderTextColor={isDark ? '#767C77' : '#8E928C'}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              style={[styles.topSearchInput, { color: isDark ? '#FFFFFF' : '#161917', backgroundColor: isDark ? '#161917' : '#FFFFFF', borderColor: isDark ? '#2E3330' : '#E2E3DC' }]}
-              autoFocus
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.topSearchClearBtn}>
-                <CloseIcon size={12} color={isDark ? '#A3AAA4' : '#70746E'} />
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-      </View>
-
-      {/* Main Content Area */}
+      {/* Main Content Area (Scrolls seamlessly underneath top floating header) */}
       <ScrollView
         style={styles.content}
-        contentContainerStyle={[styles.contentContainer, { paddingBottom: bottomBarHeight + 24 }]}
+        contentContainerStyle={[
+          styles.contentContainer,
+          {
+            paddingTop: insets.top + (searchOpen ? 128 : 74),
+            paddingBottom: bottomBarHeight + 24,
+          },
+        ]}
+        onScrollBeginDrag={() => {
+          if (isMenuExpandedRef.current && Date.now() - lastExpandedAtRef.current > 400) {
+            collapseMenu();
+          }
+        }}
+        scrollEventThrottle={16}
       >
         {/* 1. TOPIC DETAIL VIEW (Drill Down) */}
         {selectedTopic ? (
           <View style={styles.section}>
             <TouchableOpacity
               onPress={() => setSelectedTopic(null)}
-              style={styles.backButtonContainer}
+              style={[
+                styles.backButtonContainer,
+                {
+                  backgroundColor: isDark ? '#1C221E' : '#E8ECE6',
+                  borderColor: isDark ? '#2E3831' : '#D2D8CE',
+                },
+              ]}
+              activeOpacity={0.7}
             >
-              <Text style={[styles.backButtonText, isDark && { color: '#FFFFFF' }]}>← Back to {selectedArea?.title || 'Topics'}</Text>
+              <Text style={[styles.backButtonText, { color: isDark ? '#9DE8BA' : '#0D381E' }]}>
+                ← Back to {selectedArea?.title || 'Topics'}
+              </Text>
             </TouchableOpacity>
 
             <View style={[styles.overviewCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27', borderWidth: 1 }]}>
@@ -613,11 +664,16 @@ function MainScreen() {
                         idx > 0 && { borderTopWidth: 1, borderTopColor: isDark ? '#222624' : '#F0F1EC' },
                       ]}
                     >
-                      <View style={[styles.checklistIconBox, isChecked && { backgroundColor: isDark ? '#1C2921' : '#E8F5E9', borderColor: isDark ? '#2E4C38' : '#A5D6A7' }]}>
-                        {isChecked ? (
-                          <CheckIcon size={11} color={isDark ? '#9DE8BA' : '#16A34A'} />
-                        ) : (
-                          <View style={{ width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: isDark ? '#767C77' : '#8E928C' }} />
+                      <View
+                        style={[
+                          styles.checklistIconBox,
+                          isChecked
+                            ? { backgroundColor: isDark ? '#1C2921' : '#E8F5E9', borderColor: isDark ? '#2E4C38' : '#A5D6A7' }
+                            : { backgroundColor: 'transparent', borderColor: isDark ? '#3A423D' : '#D1D5DB' },
+                        ]}
+                      >
+                        {isChecked && (
+                          <CheckIcon size={12} color={isDark ? '#9DE8BA' : '#16A34A'} />
                         )}
                       </View>
                       <Text
@@ -686,9 +742,18 @@ function MainScreen() {
           <View style={styles.section}>
             <TouchableOpacity
               onPress={() => setSelectedArea(null)}
-              style={styles.backButtonContainer}
+              style={[
+                styles.backButtonContainer,
+                {
+                  backgroundColor: isDark ? '#1C221E' : '#E8ECE6',
+                  borderColor: isDark ? '#2E3831' : '#D2D8CE',
+                },
+              ]}
+              activeOpacity={0.7}
             >
-              <Text style={[styles.backButtonText, isDark && { color: '#FFFFFF' }]}>← Back to Learning Areas</Text>
+              <Text style={[styles.backButtonText, { color: isDark ? '#9DE8BA' : '#0D381E' }]}>
+                ← Back to Learning Areas
+              </Text>
             </TouchableOpacity>
 
             <View style={[styles.overviewCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27', borderWidth: 1 }]}>
@@ -717,13 +782,14 @@ function MainScreen() {
                   >
                     <TouchableOpacity
                       onPress={() => handleToggleTopicStatus(top.id, top.user_status)}
-                      style={styles.checkIconBtn}
+                      style={[
+                        styles.checklistIconBox,
+                        isDone
+                          ? { backgroundColor: isDark ? '#1C2921' : '#E8F5E9', borderColor: isDark ? '#2E4C38' : '#A5D6A7' }
+                          : { backgroundColor: 'transparent', borderColor: isDark ? '#3A423D' : '#D1D5DB' },
+                      ]}
                     >
-                      {isDone ? (
-                        <CheckIcon size={12} color={isDark ? '#9DE8BA' : '#161917'} />
-                      ) : (
-                        <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: isDark ? '#767C77' : '#8E928C' }} />
-                      )}
+                      {isDone && <CheckIcon size={12} color={isDark ? '#9DE8BA' : '#16A34A'} />}
                     </TouchableOpacity>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.topicTitle, isDark && !isDone && { color: '#FFFFFF' }, isDone && styles.topicTitleDone]}>
@@ -746,9 +812,18 @@ function MainScreen() {
           <View style={styles.section}>
             <TouchableOpacity
               onPress={() => setFocusedTask(null)}
-              style={styles.backButtonContainer}
+              style={[
+                styles.backButtonContainer,
+                {
+                  backgroundColor: isDark ? '#1C221E' : '#E8ECE6',
+                  borderColor: isDark ? '#2E3831' : '#D2D8CE',
+                },
+              ]}
+              activeOpacity={0.7}
             >
-              <Text style={[styles.backButtonText, isDark && { color: '#FFFFFF' }]}>← Back to Task List</Text>
+              <Text style={[styles.backButtonText, { color: isDark ? '#9DE8BA' : '#0D381E' }]}>
+                ← Back to Task List
+              </Text>
             </TouchableOpacity>
 
             {/* High Readability Task Detail Focus Card */}
@@ -769,10 +844,8 @@ function MainScreen() {
                   ]}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                    {focusedTask.user_status === 'COMPLETED' ? (
+                    {focusedTask.user_status === 'COMPLETED' && (
                       <CheckIcon size={12} color="#0D381E" />
-                    ) : (
-                      <View style={{ width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: '#767C77' }} />
                     )}
                     <Text style={styles.statusPillText}>
                       {focusedTask.user_status === 'COMPLETED' ? 'Completed' : 'Mark Complete'}
@@ -845,9 +918,18 @@ function MainScreen() {
             {/* Back Button to Home Dashboard */}
             <TouchableOpacity
               onPress={() => setActiveTab('Home')}
-              style={styles.backButtonContainer}
+              style={[
+                styles.backButtonContainer,
+                {
+                  backgroundColor: isDark ? '#1C221E' : '#E8ECE6',
+                  borderColor: isDark ? '#2E3831' : '#D2D8CE',
+                },
+              ]}
+              activeOpacity={0.7}
             >
-              <Text style={styles.backButtonText}>← Back to Dashboard</Text>
+              <Text style={[styles.backButtonText, { color: isDark ? '#9DE8BA' : '#0D381E' }]}>
+                ← Back to Dashboard
+              </Text>
             </TouchableOpacity>
 
             <View style={[styles.overviewCard, isDark && { backgroundColor: '#161917', borderColor: '#262A27' }]}>
@@ -862,6 +944,58 @@ function MainScreen() {
                 Tap any task card to focus, view its detailed specification, and practice related question cards.
               </Text>
             </View>
+
+            {/* Category Area Selector Tabs / Pills */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
+            >
+              <TouchableOpacity
+                onPress={() => setSelectedTaskArea('ALL')}
+                style={[
+                  styles.filterPill,
+                  isDark && { backgroundColor: '#202422', borderColor: '#2E3330' },
+                  selectedTaskArea === 'ALL' && (isDark ? { backgroundColor: '#9DE8BA', borderColor: '#9DE8BA' } : styles.filterPillActive),
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.filterPillText,
+                    isDark && { color: '#A3AAA4' },
+                    selectedTaskArea === 'ALL' && (isDark ? { color: '#0D381E', fontWeight: 'bold' } : styles.filterPillTextActive),
+                  ]}
+                >
+                  All ({tasksToDisplay.length})
+                </Text>
+              </TouchableOpacity>
+              {taskAreaList.map((areaName: string) => {
+                const count = tasksToDisplay.filter((t) => t.learning_area_title === areaName).length;
+                const done = tasksToDisplay.filter((t) => t.learning_area_title === areaName && t.user_status === 'COMPLETED').length;
+                const isSelected = selectedTaskArea === areaName;
+                return (
+                  <TouchableOpacity
+                    key={areaName}
+                    onPress={() => setSelectedTaskArea(areaName)}
+                    style={[
+                      styles.filterPill,
+                      isDark && { backgroundColor: '#202422', borderColor: '#2E3330' },
+                      isSelected && (isDark ? { backgroundColor: '#9DE8BA', borderColor: '#9DE8BA' } : styles.filterPillActive),
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.filterPillText,
+                        isDark && { color: '#A3AAA4' },
+                        isSelected && (isDark ? { color: '#0D381E', fontWeight: 'bold' } : styles.filterPillTextActive),
+                      ]}
+                    >
+                      {areaName} ({done}/{count})
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
 
             {/* Filter Pills */}
             <View style={styles.filterPillsRow}>
@@ -882,62 +1016,134 @@ function MainScreen() {
                       taskFilter === filter && (isDark ? { color: '#0D381E', fontWeight: 'bold' } : styles.filterPillTextActive),
                     ]}
                   >
-                    {filter === 'ALL' ? 'All Tasks' : filter === 'TODO' ? 'Pending' : 'Completed'}
+                    {filter === 'ALL' ? 'All Status' : filter === 'TODO' ? 'Pending' : 'Completed'}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={[styles.sectionTitle, isDark && { color: '#888F89' }]}>
-              {taskFilter === 'ALL' ? 'ALL TASKS' : taskFilter === 'TODO' ? 'PENDING TASKS' : 'COMPLETED TASKS'} ({filteredTasks.length})
-            </Text>
+            {groupedTasksByArea.size > 0 ? (
+              (Array.from(groupedTasksByArea.entries()) as [string, Task[]][]).map(([areaTitle, areaTasks]) => {
+                const isCollapsed = collapsedTaskAreas[areaTitle];
+                const areaDone = areaTasks.filter((t: Task) => t.user_status === 'COMPLETED').length;
+                const areaTotal = areaTasks.length;
+                const percent = Math.round((areaDone / areaTotal) * 100);
 
-            {filteredTasks.length > 0 ? (
-              filteredTasks.map((task) => {
-                const isDone = task.user_status === 'COMPLETED';
                 return (
-                  <TouchableOpacity
-                    key={task.id}
-                    activeOpacity={0.7}
-                    onPress={() => handleOpenTaskFocus(task)}
+                  <View
+                    key={areaTitle}
                     style={[
-                      styles.taskCard,
+                      styles.overviewCard,
+                      { padding: 14, gap: 10, marginVertical: 6 },
                       isDark && { backgroundColor: '#161917', borderColor: '#262A27' },
-                      isDone && (isDark ? { borderColor: '#1F3325', opacity: 0.8 } : styles.taskCardDone),
                     ]}
                   >
-                    <View style={styles.cardRow}>
-                      <View style={styles.tagGroup}>
-                        <Text style={styles.taskType}>{task.task_type}</Text>
-                        <Text style={[styles.priority, task.priority === 'HIGH' && styles.priorityHigh]}>
-                          {task.priority}
-                        </Text>
-                        <Text style={styles.moduleBadge}>{task.module_code || 'BM1'}</Text>
+                    {/* Area Header */}
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() =>
+                        setCollapsedTaskAreas((prev) => ({
+                          ...prev,
+                          [areaTitle]: !prev[areaTitle],
+                        }))
+                      }
+                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                    >
+                      <View style={{ flex: 1, marginRight: 8 }}>
+                        <Text style={[styles.cardHeaderSmall, isDark && { color: '#888F89' }]}>LEARNING AREA</Text>
+                        <Text style={[styles.areaTitle, isDark && { color: '#FFFFFF' }]}>{areaTitle}</Text>
                       </View>
-                      <TouchableOpacity
-                        onPress={() => handleToggleTaskStatus(task)}
-                        style={styles.taskToggleInline}
-                      >
-                        <Text style={[styles.checkIcon, isDone ? (isDark ? { color: '#9DE8BA' } : styles.checkDone) : styles.checkTodo]}>
-                          isDone ? <CheckIcon size={11} color={isDark ? '#9DE8BA' : '#161917'} /> : <View style={{ width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: isDark ? '#767C77' : '#8E928C' }} />
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View style={[styles.statusBadge, { backgroundColor: isDark ? '#202422' : '#F0F1EC' }]}>
+                          <Text style={[styles.statusBadgeText, isDark && { color: '#9DE8BA' }]}>
+                            {areaDone}/{areaTotal} ({percent}%)
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: 12, color: isDark ? '#888F89' : '#6B7280' }}>
+                          {isCollapsed ? '▼' : '▲'}
                         </Text>
-                      </TouchableOpacity>
-                    </View>
+                      </View>
+                    </TouchableOpacity>
 
-                    <Text style={[styles.taskTitle, isDark && { color: '#FFFFFF' }, isDone && (isDark ? { color: '#767C77', textDecorationLine: 'line-through' } : styles.taskTitleDone)]}>
-                      {task.title}
-                    </Text>
+                    {/* Workouts inside Area Card */}
+                    {!isCollapsed && (
+                      <View style={{ gap: 8, marginTop: 4 }}>
+                        {areaTasks.map((task: Task) => {
+                          const isDone = task.user_status === 'COMPLETED';
+                          return (
+                            <TouchableOpacity
+                              key={task.id}
+                              activeOpacity={0.7}
+                              onPress={() => handleOpenTaskFocus(task)}
+                              style={[
+                                styles.taskCard,
+                                isDark && { backgroundColor: '#1F2421', borderColor: '#2E3330' },
+                                isDone && (isDark ? { borderColor: '#1F3325', opacity: 0.8 } : styles.taskCardDone),
+                              ]}
+                            >
+                              <View style={styles.cardRow}>
+                                <View style={styles.tagGroup}>
+                                  <Text
+                                    style={[
+                                      styles.priority,
+                                      task.priority === 'URGENT'
+                                        ? { backgroundColor: '#FEE2E2', color: '#991B1B' }
+                                        : task.priority === 'HIGH'
+                                        ? styles.priorityHigh
+                                        : null,
+                                    ]}
+                                  >
+                                    {task.priority}
+                                  </Text>
+                                  <Text style={styles.taskType}>{task.task_type}</Text>
+                                  <Text style={styles.moduleBadge}>{task.module_code || 'BM1'}</Text>
+                                </View>
+                                <TouchableOpacity
+                                  onPress={() => handleToggleTaskStatus(task)}
+                                  style={[
+                                    styles.checklistIconBox,
+                                    isDone
+                                      ? { backgroundColor: isDark ? '#1C2921' : '#E8F5E9', borderColor: isDark ? '#2E4C38' : '#A5D6A7' }
+                                      : { backgroundColor: 'transparent', borderColor: isDark ? '#3A423D' : '#D1D5DB' },
+                                  ]}
+                                >
+                                  {isDone && <CheckIcon size={12} color={isDark ? '#9DE8BA' : '#16A34A'} />}
+                                </TouchableOpacity>
+                              </View>
 
-                    {task.description ? (
-                      <Text style={[styles.taskDesc, isDark && { color: '#A3AAA4' }]} numberOfLines={2}>
-                        {task.description}
-                      </Text>
-                    ) : null}
+                              <Text
+                                style={[
+                                  styles.taskTitle,
+                                  isDark && { color: '#FFFFFF' },
+                                  isDone && (isDark ? { color: '#767C77', textDecorationLine: 'line-through' } : styles.taskTitleDone),
+                                ]}
+                              >
+                                {task.title}
+                              </Text>
 
-                    <View style={styles.cardFooterRow}>
-                      <Text style={[styles.viewQuestionsHint, isDark && { color: '#9DE8BA' }]}>Tap to open questions & details ›</Text>
-                    </View>
-                  </TouchableOpacity>
+                              {task.description ? (
+                                <Text style={[styles.taskDesc, isDark && { color: '#A3AAA4' }]} numberOfLines={2}>
+                                  {task.description}
+                                </Text>
+                              ) : null}
+
+                              {task.topic_title ? (
+                                <Text style={{ fontSize: 10, fontFamily: 'monospace', color: isDark ? '#767C77' : '#888F89' }}>
+                                  Topic: {task.topic_title}
+                                </Text>
+                              ) : null}
+
+                              <View style={styles.cardFooterRow}>
+                                <Text style={[styles.viewQuestionsHint, isDark && { color: '#9DE8BA' }]}>
+                                  Tap to open questions & details ›
+                                </Text>
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </View>
                 );
               })
             ) : (
@@ -1162,9 +1368,18 @@ function MainScreen() {
           <View style={styles.section}>
             <TouchableOpacity
               onPress={() => setActiveTab('Home')}
-              style={styles.backButtonContainer}
+              style={[
+                styles.backButtonContainer,
+                {
+                  backgroundColor: isDark ? '#1C221E' : '#E8ECE6',
+                  borderColor: isDark ? '#2E3831' : '#D2D8CE',
+                },
+              ]}
+              activeOpacity={0.7}
             >
-              <Text style={[styles.backButtonText, isDark && { color: '#FFFFFF' }]}>← Back to Dashboard</Text>
+              <Text style={[styles.backButtonText, { color: isDark ? '#9DE8BA' : '#0D381E' }]}>
+                ← Back to Dashboard
+              </Text>
             </TouchableOpacity>
 
             <Text style={[styles.sectionTitle, isDark && { color: '#888F89' }]}>LEARNING AREAS (TAP TO VIEW TOPICS)</Text>
@@ -1205,9 +1420,18 @@ function MainScreen() {
             <View style={styles.analyticsHeaderRow}>
               <TouchableOpacity
                 onPress={() => setActiveTab('Home')}
-                style={styles.backButtonContainer}
+                style={[
+                  styles.backButtonContainer,
+                  {
+                    backgroundColor: isDark ? '#1C221E' : '#E8ECE6',
+                    borderColor: isDark ? '#2E3831' : '#D2D8CE',
+                  },
+                ]}
+                activeOpacity={0.7}
               >
-                <Text style={[styles.backButtonText, isDark && { color: '#FFFFFF' }]}>← Dashboard</Text>
+                <Text style={[styles.backButtonText, { color: isDark ? '#9DE8BA' : '#0D381E' }]}>
+                  ← Dashboard
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -1475,6 +1699,125 @@ function MainScreen() {
         )}
       </ScrollView>
 
+      {/* 1. TOP FLOATING ISLAND NAVIGATION WITH SOLID-TO-TRANSPARENT GRADIENT BACKDROP */}
+      <View
+        style={[
+          styles.topHeaderOverlay,
+          {
+            height: insets.top + (searchOpen ? 168 : 112),
+          },
+        ]}
+        pointerEvents="box-none"
+      >
+        {/* Upper half solid, lower half smoothly fading to transparent below the island */}
+        <Svg
+          height="100%"
+          width="100%"
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        >
+          <Defs>
+            <SvgLinearGradient id="topNavGradient" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0%" stopColor={isDark ? '#0B0D0C' : '#F0F1EC'} stopOpacity="1" />
+              <Stop offset="45%" stopColor={isDark ? '#0B0D0C' : '#F0F1EC'} stopOpacity="0.98" />
+              <Stop offset="68%" stopColor={isDark ? '#0B0D0C' : '#F0F1EC'} stopOpacity="0.75" />
+              <Stop offset="86%" stopColor={isDark ? '#0B0D0C' : '#F0F1EC'} stopOpacity="0.30" />
+              <Stop offset="100%" stopColor={isDark ? '#0B0D0C' : '#F0F1EC'} stopOpacity="0" />
+            </SvgLinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#topNavGradient)" />
+        </Svg>
+
+        <View
+          style={[
+            styles.topIsland,
+            {
+              marginTop: insets.top + 6,
+              backgroundColor: isDark ? '#161917' : '#FFFFFF',
+              borderColor: isDark ? '#262A27' : '#D8DBD2',
+              shadowColor: isDark ? '#000000' : '#161917',
+              shadowOpacity: isDark ? 0.35 : 0.09,
+            },
+          ]}
+        >
+          <View style={styles.topIslandRow}>
+            {/* Brand & Stage cluster */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setSelectedArea(null);
+                setSelectedTopic(null);
+                setFocusedTask(null);
+                setActiveTab('Home');
+              }}
+              style={styles.topBrandCluster}
+            >
+              <Image
+                source={activeLogo}
+                style={styles.topBrandLogoImage}
+                resizeMode="contain"
+              />
+              <View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[styles.topBrandName, { color: isDark ? '#FFFFFF' : '#161917' }]}>LIFT</Text>
+                  <View style={[styles.topStageBadge, { backgroundColor: isDark ? '#202422' : '#F0F1EC', borderColor: isDark ? '#2E3330' : '#E2E3DC' }]}>
+                    <Text style={[styles.topStageText, { color: isDark ? '#9DE8BA' : '#161917' }]}>BM1</Text>
+                  </View>
+                </View>
+              </View>
+            </TouchableOpacity>
+
+            {/* Action cluster: Search | Theme Toggle | Profile */}
+            <View style={styles.topActionCluster}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setSearchOpen(!searchOpen)}
+                style={[styles.topIconBtn, { backgroundColor: searchOpen ? (isDark ? '#2E3330' : '#E0E3DA') : (isDark ? '#202422' : '#EFF1EA'), borderColor: isDark ? '#2E3330' : '#D8DBD2' }]}
+              >
+                <SearchIcon size={16} color={isDark ? '#FFFFFF' : '#161917'} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setTheme(isDark ? 'light' : 'dark')}
+                style={[styles.topIconBtn, { backgroundColor: isDark ? '#202422' : '#EFF1EA', borderColor: isDark ? '#2E3330' : '#D8DBD2' }]}
+              >
+                {isDark ? <MoonIcon size={16} color="#FCE8A6" /> : <SunIcon size={16} color="#D97706" />}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setProfileModalVisible(true)}
+                style={styles.profileCircleBtn}
+              >
+                <View style={[styles.profileCircleInner, { backgroundColor: isDark ? '#262A27' : '#161917', borderColor: isDark ? '#363C38' : '#FFFFFF', borderWidth: 1 }]}>
+                  <Text style={styles.profileInitialText}>{userInitial}</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Collapsible Search Input inside the island */}
+          {searchOpen && (
+            <View style={[styles.topSearchBox, { borderTopColor: isDark ? '#262A27' : '#E2E3DC' }]}>
+              <TextInput
+                placeholder="Filter topics, tasks, workouts..."
+                placeholderTextColor={isDark ? '#767C77' : '#8E928C'}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                style={[styles.topSearchInput, { color: isDark ? '#FFFFFF' : '#161917', backgroundColor: isDark ? '#161917' : '#FFFFFF', borderColor: isDark ? '#2E3330' : '#E2E3DC' }]}
+                autoFocus
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.topSearchClearBtn}>
+                  <CloseIcon size={12} color={isDark ? '#A3AAA4' : '#70746E'} />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+        </View>
+      </View>
+
       {/* 2. CENTER HOME QUICK-LAUNCH POP-UP DOCK WITH MICRO-ANIMATION */}
       {quickHubVisible && (
         <View style={styles.quickHubOverlay}>
@@ -1685,7 +2028,7 @@ function MainScreen() {
         </View>
       )}
 
-      {/* 3. COLLAPSIBLE FLOATING BOTTOM MENU BAR (COLLAPSES TO CIRCLE ORB / EXTENDS WITH MICRO-ANIMATION) */}
+      {/* 3. COLLAPSIBLE FLOATING BOTTOM MENU BAR (PERFECT SYMMETRY, ZERO SKEWNESS) */}
       <View style={[styles.bottomNavWrapper, { bottom: insets.bottom > 0 ? insets.bottom : 12 }]}>
         <Animated.View
           ref={navBarViewRef}
@@ -1695,35 +2038,28 @@ function MainScreen() {
             styles.bottomNavIslandAnimated,
             {
               backgroundColor: isDark ? '#161917' : '#FFFFFF',
-              borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : '#D8DBD2',
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.14)' : '#D0D3CA',
               shadowColor: isDark ? '#000000' : '#161917',
-              shadowOpacity: isDark ? 0.45 : 0.14,
+              shadowOpacity: isDark ? 0.5 : 0.16,
               width: menuAnim.interpolate({
                 inputRange: [0, 1],
-                outputRange: [58, Math.min(Dimensions.get('window').width - 32, 440)],
+                outputRange: [60, Math.min(Dimensions.get('window').width - 32, 420)],
               }),
+              height: 60,
               borderRadius: 30,
-              paddingHorizontal: menuAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [4, 8],
-              }),
             },
           ]}
         >
-          {/* Left Side: Learn & Tasks (Extends with micro-animation) */}
+          {/* Left Wing: Learn & Tasks (Symmetrical) */}
           <Animated.View
             style={[
-              styles.sideNavGroup,
+              styles.sideNavWing,
               {
+                width: menuAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, (Math.min(Dimensions.get('window').width - 32, 420) - 60) / 2],
+                }),
                 opacity: menuAnim,
-                transform: [
-                  {
-                    translateX: menuAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [40, 0],
-                    }),
-                  },
-                ],
               },
             ]}
             pointerEvents={isMenuExpanded ? 'auto' : 'none'}
@@ -1731,12 +2067,7 @@ function MainScreen() {
             {/* Slot 1: Learn */}
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => {
-                setSelectedArea(null);
-                setSelectedTopic(null);
-                setFocusedTask(null);
-                setActiveTab('Learn');
-              }}
+              onPress={() => handleSelectNavTab('Learn')}
               style={styles.navSlot}
             >
               <View
@@ -1771,12 +2102,7 @@ function MainScreen() {
             {/* Slot 2: Tasks */}
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => {
-                setSelectedArea(null);
-                setSelectedTopic(null);
-                setFocusedTask(null);
-                setActiveTab('Tasks');
-              }}
+              onPress={() => handleSelectNavTab('Tasks')}
               style={styles.navSlot}
             >
               <View
@@ -1809,28 +2135,30 @@ function MainScreen() {
             </TouchableOpacity>
           </Animated.View>
 
-          {/* Center: CIRCLE HOME ORB (Tap to navigate/hub, Hold to extend/collapse menu) */}
+          {/* Center: HOME CIRCLE (Always centered, Hold to expand/collapse) */}
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => {
               if (!isMenuExpanded) {
-                // When collapsed, tapping extends the menu bar with spring micro-animation!
-                toggleMenuExpansion(true);
+                // When collapsed, tap or hold smoothly extends the menu bar for 3.5s!
+                expandMenu(3.5);
               } else if (activeTab === 'Home' && !selectedArea && !selectedTopic && !focusedTask) {
                 // When already on Home and expanded, open exclusive Quick Hub
+                clearAutoCollapseTimer();
                 setQuickHubVisible(true);
+                collapseMenu();
               } else {
-                setSelectedArea(null);
-                setSelectedTopic(null);
-                setFocusedTask(null);
-                setActiveTab('Home');
+                handleSelectNavTab('Home');
               }
             }}
             onLongPress={() => {
-              // Holding expands or collapses the menu bar smoothly!
-              toggleMenuExpansion();
+              if (!isMenuExpanded) {
+                expandMenu(3.5);
+              } else {
+                collapseMenu();
+              }
             }}
-            delayLongPress={220}
+            delayLongPress={180}
             style={styles.navCenterHubSlot}
           >
             <View
@@ -1839,7 +2167,6 @@ function MainScreen() {
                 activeTab === 'Home' && !selectedArea && !selectedTopic && !focusedTask
                   ? (isDark ? styles.navCenterHubActiveDark : styles.navCenterHubActiveLight)
                   : (isDark ? styles.navCenterHubInactiveDark : styles.navCenterHubInactiveLight),
-                !isMenuExpanded && styles.navCenterOrbCollapsed,
               ]}
             >
               <HomeIcon
@@ -1850,26 +2177,19 @@ function MainScreen() {
                     : (isDark ? '#E2E8F0' : '#161917')
                 }
               />
-              {!isMenuExpanded && (
-                <View style={[styles.orbPulseDot, { backgroundColor: isDark ? '#9DE8BA' : '#161917' }]} />
-              )}
             </View>
           </TouchableOpacity>
 
-          {/* Right Side: TOI & Progress (Extends with micro-animation) */}
+          {/* Right Wing: TOI & Progress (Symmetrical mirror of Left Wing) */}
           <Animated.View
             style={[
-              styles.sideNavGroup,
+              styles.sideNavWing,
               {
+                width: menuAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, (Math.min(Dimensions.get('window').width - 32, 420) - 60) / 2],
+                }),
                 opacity: menuAnim,
-                transform: [
-                  {
-                    translateX: menuAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [-40, 0],
-                    }),
-                  },
-                ],
               },
             ]}
             pointerEvents={isMenuExpanded ? 'auto' : 'none'}
@@ -1877,12 +2197,7 @@ function MainScreen() {
             {/* Slot 4: TOI */}
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => {
-                setSelectedArea(null);
-                setSelectedTopic(null);
-                setFocusedTask(null);
-                setActiveTab('TOI');
-              }}
+              onPress={() => handleSelectNavTab('TOI')}
               style={styles.navSlot}
             >
               <View
@@ -1917,12 +2232,7 @@ function MainScreen() {
             {/* Slot 5: Progress / Stats */}
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => {
-                setSelectedArea(null);
-                setSelectedTopic(null);
-                setFocusedTask(null);
-                setActiveTab('Progress');
-              }}
+              onPress={() => handleSelectNavTab('Progress')}
               style={styles.navSlot}
             >
               <View
@@ -2214,11 +2524,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 12,
   },
-  // Floating Top Island Navigation
+  // Floating Top Island Navigation with Gradient Backdrop
+  topHeaderOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 50,
+  },
   topIsland: {
     marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 6,
     borderRadius: 24,
     borderWidth: 1,
     overflow: 'hidden',
@@ -2362,13 +2677,19 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   backButtonContainer: {
-    paddingVertical: 6,
-    marginBottom: 4,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   backButtonText: {
-    color: '#161917',
     fontSize: 13,
     fontWeight: '700',
+    letterSpacing: -0.2,
   },
   sectionTitle: {
     color: '#70746E',
@@ -2835,6 +3156,16 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     fontWeight: 'bold',
   },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#374151',
+  },
   taskToggleInline: {
     padding: 4,
   },
@@ -3244,8 +3575,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#D8DBD2',
+    borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -3273,54 +3603,43 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     overflow: 'hidden',
     shadowOffset: { width: 0, height: 8 },
     shadowRadius: 18,
     elevation: 12,
   },
-  sideNavGroup: {
-    flex: 1,
+  sideNavWing: {
+    height: 60,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-  },
-  navCenterOrbCollapsed: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-  },
-  orbPulseDot: {
-    position: 'absolute',
-    bottom: 3,
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+    overflow: 'hidden',
   },
 
-  // Center Home Hub Button
+  // Center Home Hub Button (Equal 8px distance on all sides from inner to outer circle)
   navCenterHubSlot: {
+    width: 60,
+    height: 60,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
   },
   navCenterHubBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 6,
   },
   navCenterHubActiveDark: {
     backgroundColor: '#9DE8BA',
+    borderWidth: 1,
+    borderColor: '#9DE8BA',
   },
   navCenterHubActiveLight: {
     backgroundColor: '#161917',
+    borderWidth: 1,
+    borderColor: '#161917',
   },
   navCenterHubInactiveDark: {
     backgroundColor: '#202422',
