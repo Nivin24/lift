@@ -134,6 +134,10 @@ def update_onboarding(
 ):
     if onboarding_data.selected_domain is not None:
         current_user.selected_domain = onboarding_data.selected_domain
+    if onboarding_data.course_duration is not None:
+        current_user.course_duration = onboarding_data.course_duration
+    if onboarding_data.batch_number is not None:
+        current_user.batch_number = onboarding_data.batch_number
     if onboarding_data.experience_level is not None:
         current_user.experience_level = onboarding_data.experience_level
     if onboarding_data.primary_goal is not None:
@@ -150,7 +154,7 @@ def update_onboarding(
     act = ActivityLog(
         user_id=current_user.id,
         action_type="ONBOARDING_COMPLETED",
-        description=f"Domain selected: {current_user.selected_domain} | Goal: {current_user.primary_goal}"
+        description=f"Course: {current_user.selected_domain} | Duration: {current_user.course_duration} | Batch: {current_user.batch_number}"
     )
     db.add(act)
     db.commit()

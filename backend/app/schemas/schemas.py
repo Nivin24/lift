@@ -22,6 +22,8 @@ class UserOut(BaseModel):
     is_active: bool
     created_at: datetime
     selected_domain: Optional[str] = "data_science"
+    course_duration: Optional[str] = None  # '7_months' | '1_year'
+    batch_number: Optional[str] = None     # e.g. 'B-42'
     experience_level: Optional[str] = None
     primary_goal: Optional[str] = None
     daily_commitment_hours: Optional[float] = 2.0
@@ -29,7 +31,9 @@ class UserOut(BaseModel):
     onboarding_completed: Optional[bool] = False
 
 class StudentOnboardingUpdate(BaseModel):
-    selected_domain: Optional[str] = "data_science"
+    selected_domain: str = "data_science"
+    course_duration: str = "7_months"  # '7_months' | '1_year'
+    batch_number: Optional[str] = None
     experience_level: Optional[str] = None
     primary_goal: Optional[str] = None
     daily_commitment_hours: Optional[float] = 2.0

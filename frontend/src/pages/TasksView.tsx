@@ -10,7 +10,6 @@ import {
   FileText,
   ChevronRight,
   ChevronDown,
-  Sparkles,
   BookOpen,
   Filter,
   Check,
@@ -90,7 +89,7 @@ const CATEGORY_META: Record<string, {
     defaultModule: 'BM1',
   },
   'Machine Learning Concepts': {
-    icon: Sparkles,
+    icon: Cpu,
     colorBgLight: 'bg-purple-500/10 border-purple-500/20',
     colorBgDark: 'dark:bg-purple-500/15 dark:border-purple-500/30',
     textColor: 'text-purple-600 dark:text-pink-400',
@@ -1053,7 +1052,7 @@ export const TasksView: React.FC<TasksViewProps> = ({ onSelectTopic, onBackToDas
             <div className="p-5 sm:p-6 border-b border-[#F0F1EC] dark:border-[#202422] flex items-center justify-between shrink-0 bg-[#FAFAF8] dark:bg-[#161917]/70">
               <div className="flex items-center space-x-3">
                 <div className="p-2.5 rounded-2xl bg-[#9DE8BA]/20 text-[#0D381E] dark:text-[#9DE8BA]">
-                  <Sparkles className="w-5 h-5" />
+                  <Layers className="w-5 h-5" />
                 </div>
                 <div>
                   <div className="flex items-center space-x-2">
@@ -1167,7 +1166,7 @@ export const TasksView: React.FC<TasksViewProps> = ({ onSelectTopic, onBackToDas
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <h4 className="text-xs font-bold text-[#0D381E] dark:text-[#9DE8BA] flex items-center space-x-1.5">
-                        <Sparkles className="w-3.5 h-3.5" />
+                        <Cpu className="w-3.5 h-3.5" />
                         <span>LLM Cognitive Deconstructor & Architecture Generator</span>
                       </h4>
                       <p className="text-[11px] text-[#4B5563] dark:text-[#A3AAA4] mt-0.5">
@@ -1188,7 +1187,7 @@ export const TasksView: React.FC<TasksViewProps> = ({ onSelectTopic, onBackToDas
                         </>
                       ) : (
                         <>
-                          <Sparkles className="w-3.5 h-3.5" />
+                          <Cpu className="w-3.5 h-3.5" />
                           <span>Deconstruct & Plan Architecture</span>
                         </>
                       )}

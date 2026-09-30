@@ -9,7 +9,6 @@ import {
   ChevronRight,
   ShieldAlert,
   ArrowLeft,
-  Sparkles,
   BookOpen,
 } from 'lucide-react';
 

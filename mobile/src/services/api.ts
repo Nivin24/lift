@@ -36,6 +36,8 @@ export interface MobileUser {
   email: string;
   full_name?: string;
   selected_domain?: string;
+  course_duration?: string;
+  batch_number?: string;
   experience_level?: string;
   primary_goal?: string;
   daily_commitment_hours?: number;

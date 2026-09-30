@@ -5,6 +5,10 @@ export interface User {
   full_name?: string;
   is_active: boolean;
   created_at: string;
+  selected_domain?: string;
+  course_duration?: string;
+  batch_number?: string;
+  onboarding_completed?: boolean;
 }
 
 export interface ModuleStatus {

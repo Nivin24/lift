@@ -74,6 +74,8 @@ def ensure_schema_migrations(engine):
         existing_user_cols = {col["name"] for col in inspector.get_columns("users")}
         user_cols = [
             ("selected_domain", "VARCHAR(100) DEFAULT 'data_science'"),
+            ("course_duration", "VARCHAR(50)"),
+            ("batch_number", "VARCHAR(50)"),
             ("experience_level", "VARCHAR(50)"),
             ("primary_goal", "VARCHAR(100)"),
             ("daily_commitment_hours", "FLOAT DEFAULT 2.0"),

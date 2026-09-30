@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Copy, Check, Terminal, BookOpen, Sparkles } from 'lucide-react';
+import { Copy, Check, Terminal, BookOpen, Bookmark } from 'lucide-react';
 
 interface StudyMaterialViewerProps {
   content: string;
@@ -86,7 +86,7 @@ export const StudyMaterialViewer: React.FC<StudyMaterialViewerProps> = ({
             ),
             blockquote: ({ children }) => (
               <div className="my-4 p-4 rounded-2xl bg-[#FCE8A6]/40 dark:bg-[#3B2B00]/40 border border-amber-300/60 dark:border-amber-700/60 text-[#553E00] dark:text-[#FCE8A6] text-xs leading-relaxed flex items-start space-x-3">
-                <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                <Bookmark className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
                 <div className="font-sans space-y-1">{children}</div>
               </div>
             ),

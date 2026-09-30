@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Sparkles,
+  Cpu,
   X,
   CheckCircle,
   AlertCircle,
@@ -113,7 +113,7 @@ export const AIGeneratorModal: React.FC<AIGeneratorModalProps> = ({
         <div className="p-4 border-b border-workspace-border flex items-center justify-between bg-workspace-card/50">
           <div className="flex items-center space-x-2">
             <div className="p-1.5 rounded-md bg-purple-500/20 text-purple-400 border border-purple-500/30">
-              <Sparkles className="w-4 h-4" />
+              <Cpu className="w-4 h-4" />
             </div>
             <div>
               <h2 className="text-sm font-semibold text-white">AI Content Generation</h2>
@@ -216,7 +216,7 @@ export const AIGeneratorModal: React.FC<AIGeneratorModalProps> = ({
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-3.5 h-3.5" />
+                  <Cpu className="w-3.5 h-3.5" />
                   <span>Generate Content</span>
                 </>
               )}
@@ -264,7 +264,7 @@ export const AIGeneratorModal: React.FC<AIGeneratorModalProps> = ({
             </div>
           ) : (
             <div className="h-48 flex flex-col items-center justify-center text-slate-400 space-y-2">
-              <Sparkles className="w-8 h-8 text-purple-400/40" />
+              <Cpu className="w-8 h-8 text-purple-400/40" />
               <p className="font-mono text-xs">Click "Generate Content" to draft structured curriculum material.</p>
               <p className="text-[11px] text-slate-400">Content will be shown here for review before saving.</p>
             </div>

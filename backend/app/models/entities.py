@@ -19,6 +19,8 @@ class User(Base):
 
     # Student Onboarding & Track Selection
     selected_domain = Column(String(100), default="data_science")
+    course_duration = Column(String(50), nullable=True)  # '7_months' or '1_year'
+    batch_number = Column(String(50), nullable=True)     # e.g. 'B-42', 'DSA-108'
     experience_level = Column(String(50), nullable=True)
     primary_goal = Column(String(100), nullable=True)
     daily_commitment_hours = Column(Float, default=2.0)

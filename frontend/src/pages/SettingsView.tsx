@@ -3,7 +3,7 @@ import { AISettings } from '../types';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
-  Sparkles,
+  Sliders,
   Key,
   ShieldCheck,
   CheckCircle,
@@ -102,7 +102,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRefreshGlobal }) =
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-[#161917] tracking-tight flex items-center space-x-2">
-          <Sparkles className="w-6 h-6 text-[#161917]" />
+          <Sliders className="w-6 h-6 text-[#161917]" />
           <span>Platform Settings & BYOK</span>
         </h1>
         <p className="text-xs text-[#6B7280] font-mono mt-1">

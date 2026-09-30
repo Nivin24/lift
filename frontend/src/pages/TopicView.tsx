@@ -8,7 +8,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   Clock,
-  Sparkles,
+  Cpu,
   BookOpen,
   FileText,
   ExternalLink,
@@ -194,7 +194,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
               onClick={() => setAiModalOpen(true)}
               className="flex items-center space-x-2 px-4 py-2.5 bg-[#161917] dark:bg-white text-white dark:text-[#161917] rounded-full text-xs font-semibold shadow-xs hover:opacity-90 transition-all"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400 dark:text-amber-500" />
+              <Cpu className="w-3.5 h-3.5 text-[#0D381E] dark:text-[#9DE8BA]" />
               <span>AI Actions</span>
             </button>
 
@@ -452,7 +452,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                 onClick={() => setAiModalOpen(true)}
                 className="inline-flex items-center space-x-2 px-5 py-2.5 bg-[#161917] dark:bg-white text-white dark:text-[#161917] rounded-full text-xs font-semibold shadow-xs hover:opacity-90 transition-all"
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400 dark:text-amber-500" />
+                <Cpu className="w-3.5 h-3.5 text-emerald-600 dark:text-[#9DE8BA]" />
                 <span>Generate with Gemini</span>
               </button>
             </div>
@@ -554,7 +554,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                 onClick={() => setAiModalOpen(true)}
                 className="inline-flex items-center space-x-2 px-5 py-2.5 bg-[#161917] dark:bg-white text-white dark:text-[#161917] rounded-full text-xs font-semibold shadow-xs hover:opacity-90 transition-all"
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400 dark:text-amber-500" />
+                <Cpu className="w-3.5 h-3.5 text-emerald-600 dark:text-[#9DE8BA]" />
                 <span>Generate Questions with Gemini</span>
               </button>
             </div>

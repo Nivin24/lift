@@ -6,6 +6,8 @@ export interface User {
   is_active: boolean;
   created_at: string;
   selected_domain?: string;
+  course_duration?: '7_months' | '1_year' | string;
+  batch_number?: string;
   experience_level?: string;
   primary_goal?: string;
   daily_commitment_hours?: number;
@@ -15,9 +17,11 @@ export interface User {
 
 export interface StudentOnboardingData {
   selected_domain: string;
-  experience_level: string;
-  primary_goal: string;
-  daily_commitment_hours: number;
+  course_duration: '7_months' | '1_year' | string;
+  batch_number: string;
+  experience_level?: string;
+  primary_goal?: string;
+  daily_commitment_hours?: number;
   target_completion_date?: string;
   onboarding_completed: boolean;
 }
