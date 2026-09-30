@@ -21,6 +21,21 @@ class UserOut(BaseModel):
     full_name: Optional[str] = None
     is_active: bool
     created_at: datetime
+    selected_domain: Optional[str] = "data_science"
+    experience_level: Optional[str] = None
+    primary_goal: Optional[str] = None
+    daily_commitment_hours: Optional[float] = 2.0
+    target_completion_date: Optional[str] = None
+    onboarding_completed: Optional[bool] = False
+
+class StudentOnboardingUpdate(BaseModel):
+    selected_domain: Optional[str] = "data_science"
+    experience_level: Optional[str] = None
+    primary_goal: Optional[str] = None
+    daily_commitment_hours: Optional[float] = 2.0
+    target_completion_date: Optional[str] = None
+    onboarding_completed: bool = True
+
 
 class Token(BaseModel):
     access_token: str
@@ -30,6 +45,14 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     user_id: Optional[int] = None
     username: Optional[str] = None
+
+class PasswordResetRequest(BaseModel):
+    username_or_email: str
+
+class PasswordResetConfirm(BaseModel):
+    username_or_email: str
+    new_password: str = Field(..., min_length=6)
+    reset_code: Optional[str] = None
 
 # --- Modules & Progression ---
 class ModuleOut(BaseModel):

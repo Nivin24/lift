@@ -17,6 +17,14 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
+    # Student Onboarding & Track Selection
+    selected_domain = Column(String(100), default="data_science")
+    experience_level = Column(String(50), nullable=True)
+    primary_goal = Column(String(100), nullable=True)
+    daily_commitment_hours = Column(Float, default=2.0)
+    target_completion_date = Column(String(50), nullable=True)
+    onboarding_completed = Column(Boolean, default=False)
+
     # Relationships
     topic_progress = relationship("UserTopicProgress", back_populates="user", cascade="all, delete-orphan")
     task_progress = relationship("UserTaskProgress", back_populates="user", cascade="all, delete-orphan")

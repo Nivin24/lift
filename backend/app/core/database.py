@@ -69,6 +69,30 @@ def ensure_schema_migrations(engine):
                 except Exception as e:
                     logger.warning(f"Could not add column {col} to topics: {e}")
 
+    # 3. Users columns (Student Onboarding & Multi-Domain Tracks)
+    if "users" in inspector.get_table_names():
+        existing_user_cols = {col["name"] for col in inspector.get_columns("users")}
+        user_cols = [
+            ("selected_domain", "VARCHAR(100) DEFAULT 'data_science'"),
+            ("experience_level", "VARCHAR(50)"),
+            ("primary_goal", "VARCHAR(100)"),
+            ("daily_commitment_hours", "FLOAT DEFAULT 2.0"),
+            ("target_completion_date", "VARCHAR(50)"),
+            ("onboarding_completed", "BOOLEAN DEFAULT FALSE"),
+        ]
+        for col, col_type in user_cols:
+            if col not in existing_user_cols:
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} {col_type}"))
+                except Exception as e:
+                    logger.warning(f"Could not add column {col} to users: {e}")
+
+try:
+    ensure_schema_migrations(engine)
+except Exception as _e:
+    pass
+
 def get_db():
     db: Session = SessionLocal()
     try:
